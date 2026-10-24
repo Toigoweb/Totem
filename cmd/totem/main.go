@@ -5,6 +5,9 @@
 //	totem scan            chiede una scansione immediata delle share
 //	totem abbina-postazione [--nome "PC ufficio IT"]
 //	                      stampa un codice monouso (10 minuti) per abbinare un altro PC
+//	totem abbina-totem [--reparto "Magazzino"]
+//	                      stampa un codice monouso (10 minuti) per aggiungere un totem
+//	totem stato           stato in testo (come /api/monitor), uscita 1 se c'è un errore
 //	totem reset-pairing   invalida i token dei dispositivi e genera un nuovo codice di setup
 //	                      (--reset-pin azzera anche il PIN)
 package main
@@ -16,6 +19,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
 	"net/http"
@@ -67,10 +71,14 @@ func main() {
 		os.Exit(scanNow())
 	case "abbina-postazione":
 		os.Exit(pairStation(args))
+	case "abbina-totem":
+		os.Exit(pairTotem(args))
+	case "stato":
+		os.Exit(statusText())
 	case "version", "--version", "-v":
 		fmt.Println(version.Version)
 	default:
-		fmt.Fprintf(os.Stderr, "comando sconosciuto %q (serve | healthcheck | scan | abbina-postazione [--nome N] | reset-pairing [--reset-pin] | version)\n", cmd)
+		fmt.Fprintf(os.Stderr, "comando sconosciuto %q (serve | healthcheck | stato | scan | abbina-postazione [--nome N] | abbina-totem [--reparto R] | reset-pairing [--reset-pin] | version)\n", cmd)
 		os.Exit(2)
 	}
 }
@@ -239,6 +247,51 @@ func pairStation(args []string) int {
 		return 1
 	}
 	fmt.Printf("Codice per la postazione «%s»: %s\nValido 10 minuti, una sola volta. Sull'altro PC: aprire l'indirizzo del totem → Inizia configurazione → inserire il codice.\n", *nome, out.Code)
+	return 0
+}
+
+// pairTotem chiede al server un codice per aggiungere un totem (eventualmente a un reparto).
+func pairTotem(args []string) int {
+	fs := flag.NewFlagSet("abbina-totem", flag.ContinueOnError)
+	rep := fs.String("reparto", "", "nome o id del reparto (vuoto = tutte le sezioni)")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	c := &http.Client{Timeout: 5 * time.Second}
+	resp, err := c.Post(internalURL("/internal/pair-totem?reparto="+url.QueryEscape(*rep)), "application/json", bytes.NewReader(nil))
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "abbina-totem: server non raggiungibile:", err)
+		return 1
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusNotFound {
+		fmt.Fprintf(os.Stderr, "abbina-totem: reparto %q inesistente\n", *rep)
+		return 1
+	}
+	var out struct {
+		Code string `json:"code"`
+	}
+	if resp.StatusCode != http.StatusOK || json.NewDecoder(resp.Body).Decode(&out) != nil {
+		fmt.Fprintln(os.Stderr, "abbina-totem: risposta inattesa, HTTP", resp.StatusCode)
+		return 1
+	}
+	fmt.Printf("Codice per il nuovo totem: %s\nValido 10 minuti, una sola volta. Sul nuovo totem: aprire l'indirizzo → Inizia configurazione → inserire il codice.\n", out.Code)
+	return 0
+}
+
+// statusText stampa lo stato come la pagina di monitoraggio (senza token: listener interno).
+func statusText() int {
+	c := &http.Client{Timeout: 5 * time.Second}
+	resp, err := c.Get(internalURL("/internal/monitor?formato=testo"))
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "stato: server non raggiungibile:", err)
+		return 1
+	}
+	defer resp.Body.Close()
+	_, _ = io.Copy(os.Stdout, resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return 1
+	}
 	return 0
 }
 

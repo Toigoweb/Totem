@@ -89,7 +89,7 @@ Le chiavi sono in italiano perché è l'unico file pensato per essere letto da u
 
 ```json
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "sezioni": [
     {
       "id": "s_k3v9q2",
@@ -120,6 +120,9 @@ Le chiavi sono in italiano perché è l'unico file pensato per essere letto da u
       }
     ]
   },
+  "reparti": [
+    { "id": "r_m4g4zz", "nome": "Magazzino", "sezioni": ["s_p81mza"] }
+  ],
   "impostazioni": {
     "intervalloScansione": "2m",
     "giorniAvviso": 3
@@ -156,3 +159,47 @@ sync) sta in `/data/state/heartbeat.json`, per non riscrivere config.json a ogni
 /data/logs/sync.log          log JSON per riga, rotazione a 5 MB × 5 file
 /secrets/key                 32 byte casuali, permessi 0600
 ```
+
+## Novità della schemaVersion 2 di config.json
+
+Campi aggiunti (la migrazione da 1 a 2 crea il backup e non trasforma nulla):
+
+```json
+{
+  "reparti": [{ "id": "r_m4g4zz", "nome": "Magazzino", "sezioni": ["s_p81mza"] }],
+  "globali": {
+    "dispositivi": [{ "id": "d_x1y2z3", "ruolo": "totem", "reparto": "r_m4g4zz", "…": "…" }],
+    "contatti": [{ "id": "c_1a2b3c", "etichetta": "Emergenze", "numero": "112", "reparti": [] }],
+    "avvisi": [{ "id": "a_9z8y7x", "testo": "Esercitazione giovedì alle 10", "livello": "attenzione",
+                 "dal": "2026-10-27", "al": "2026-10-30", "reparti": [] }],
+    "salvaschermo": { "attivo": true, "dopoMinuti": 5, "notte": true, "orarioNero": "20:00-06:00" },
+    "monitor": { "tokenHash": "…sha256…", "sogliaMinuti": 30 }
+  }
+}
+```
+
+| Campo | Regole |
+|---|---|
+| `reparti[].sezioni` | Id di sezioni esistenti; vuoto = tutte. Nomi unici, 1-30 caratteri, massimo 20 reparti. |
+| `dispositivi[].reparto` | Solo per i totem; vuoto = tutte le sezioni. Postazioni e telefoni vedono tutto. |
+| `contatti` | Massimo 8; numero con cifre, spazi e `+ / . -`; `reparti` vuoto = tutti. |
+| `avvisi` | Massimo 10; testo 1-200 caratteri; `livello` `info` o `attenzione`; date `AAAA-MM-GG` incluse. |
+| `monitor.tokenHash` | SHA-256 del token; vuoto = pagina di monitoraggio disattivata (404). |
+
+## Campi aggiuntivi del manifest per dispositivo
+
+Il server costruisce per ogni dispositivo una **vista** del manifest: sezioni e documenti
+del suo reparto, più:
+
+```json
+{
+  "role": "totem",
+  "department": { "id": "r_m4g4zz", "name": "Magazzino" },
+  "contacts": [{ "label": "Emergenze", "number": "112" }],
+  "notices": [{ "id": "a_9z8y7x", "text": "Esercitazione giovedì alle 10", "level": "attenzione", "from": "2026-10-27", "to": "2026-10-30" }],
+  "screensaver": { "enabled": true, "afterMinutes": 5, "night": true, "nightHours": "20:00-06:00" }
+}
+```
+
+`hash` è calcolato sulla vista (contenuti e dati del reparto): se cambia un avviso, il
+totem lo riprende alla sync successiva. `version` resta quella globale del server.

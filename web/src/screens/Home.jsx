@@ -1,7 +1,7 @@
 import { Icon } from '../components/Icon.jsx';
 import { TopBar } from '../components/TopBar.jsx';
 import { S } from '../strings.js';
-import { app, go, cycleScale, docsBySection, recentDocs, APP_VERSION } from '../app.js';
+import { app, go, cycleScale, docsBySection, recentDocs, activeNotices, APP_VERSION } from '../app.js';
 import { useStore } from '../store.js';
 import { fmtDate } from '../format.js';
 
@@ -29,6 +29,17 @@ function Footer() {
   );
 }
 
+/** Avviso in Home: icona e testo, non solo colore. */
+export function NoticeBanner({ n }) {
+  const warn = n.level === 'attenzione';
+  return (
+    <div class={`banner ${warn ? '' : 'info'}`} role="status" data-testid="notice">
+      <Icon name={warn ? 'avviso' : 'info'} />
+      <div><strong>{warn ? S.noticeWarn : S.noticeInfo}:</strong> {n.text}</div>
+    </div>
+  );
+}
+
 export function Home() {
   const s = useStore(app);
   if (s.paired === false && !s.docs.length) {
@@ -52,16 +63,21 @@ export function Home() {
   const emergency = s.sections.filter((x) => x.emergency);
   const recent = recentDocs(s.docs, s.settings.recentDays || 30);
   const secName = Object.fromEntries(s.sections.map((x) => [x.id, x.name]));
+  const contacts = s.extras.contacts || [];
+  const notices = activeNotices(s.extras.notices);
+  const title = s.extras.department ? `${S.appTitle} · ${s.extras.department.name}` : S.appTitle;
 
   return (
     <div class="screen" data-testid="home">
-      <TopBar title={S.appTitle} />
+      <TopBar title={title} />
       <div class="body">
         <button class="cerca" data-testid="search-open" onClick={() => go('search')}>
           <Icon name="cerca" />{S.searchPlaceholder}
         </button>
 
-        {emergency.length > 0 && (
+        {notices.map((n) => <NoticeBanner key={n.id} n={n} />)}
+
+        {(emergency.length > 0 || contacts.length > 0) && (
           <div class="emergenza" data-testid="emergency">
             <div class="tit"><Icon name="avviso" />{S.emergency}</div>
             {emergency.map((sec) => (
@@ -69,6 +85,13 @@ export function Home() {
                 <Icon name={sec.icon} />{sec.name}
               </button>
             ))}
+            {contacts.length > 0 && (
+              <ul class="numeri" aria-label={S.usefulNumbers} data-testid="contacts">
+                {contacts.map((c, i) => (
+                  <li key={i}><span class="num">{c.number}</span><span class="lab">{c.label}</span></li>
+                ))}
+              </ul>
+            )}
           </div>
         )}
 

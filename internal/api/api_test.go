@@ -59,13 +59,14 @@ func newHarness(t *testing.T) *harness {
 	h.sc, err = scanner.New(scanner.Options{
 		DataDir: h.data, Config: h.cfg, Cipher: h.ci, Settings: config.DefaultSettings(), Log: sl, Logger: lg, Now: h.clk.Now,
 		Connect: func(ctx context.Context, t smbsrc.Target) (smbsrc.Source, error) {
-			if t.Path != `\\srv\sds` {
+			if t.Path != `\\srv\sds` && !strings.HasPrefix(t.Path, `\\srv\sds\`) {
 				return nil, &smbsrc.Error{Code: smbsrc.ErrNotFound, Err: errors.New("bad network name")}
 			}
 			if t.Password != "giusta" {
 				return nil, &smbsrc.Error{Code: smbsrc.ErrAuth, Err: errors.New("logon failure")}
 			}
-			return &smbsrc.DirSource{Root: h.share, Recursive: t.Recursive}, nil
+			sub := strings.TrimPrefix(strings.TrimPrefix(t.Path, `\\srv\sds`), `\`)
+			return &smbsrc.DirSource{Root: filepath.Join(h.share, sub), Recursive: t.Recursive}, nil
 		},
 	})
 	if err != nil {
@@ -561,9 +562,9 @@ func TestStations(t *testing.T) {
 	if sta["ruolo"] != "postazione" || sta["corrente"] != true {
 		t.Fatal(sta)
 	}
-	// non si revoca il totem né sé stessi
-	if r := M(pc, pt, "DELETE", "/api/maint/devices/"+tot["id"].(string), nil); r.code != 404 {
-		t.Fatal("totem revocato", r.code)
+	// non si revoca sé stessi; un id inesistente dà 404
+	if r := M(pc, pt, "DELETE", "/api/maint/devices/d_manca", nil); r.code != 404 {
+		t.Fatal(r.code)
 	}
 	if r := M(pc, pt, "DELETE", "/api/maint/devices/"+sta["id"].(string), nil); r.code != 409 {
 		t.Fatal("auto-revoca", r.code)
@@ -615,5 +616,236 @@ func TestProblems(t *testing.T) {
 	}
 	if r := h.do(c, "GET", "/api/maint/problems", nil); r.code != 401 {
 		t.Fatal("problemi senza PIN")
+	}
+}
+
+// extrasHarness: totem abbinato con due sezioni e tre PDF.
+func extrasHarness(t *testing.T) (*harness, *http.Client, string) {
+	h := newHarness(t)
+	c, mt := h.pair("1234")
+	os.MkdirAll(filepath.Join(h.share, "A"), 0o755)
+	os.MkdirAll(filepath.Join(h.share, "B"), 0o755)
+	os.WriteFile(filepath.Join(h.share, "A", "a1.pdf"), pdf("a1"), 0o644)
+	os.WriteFile(filepath.Join(h.share, "A", "a2.pdf"), pdf("a2"), 0o644)
+	os.WriteFile(filepath.Join(h.share, "B", "b1.pdf"), pdf("b1"), 0o644)
+	enc := func(id string) string { e, _ := h.ci.Encrypt(id, "giusta"); return e }
+	h.cfg.Update(func(cfg *config.Config) error {
+		cfg.Sezioni = []config.Section{
+			{ID: "s_a", Nome: "A", Icona: "flacone", Ordine: 1, Share: config.Share{Percorso: `\\srv\sds\A`, Password: enc("s_a")}},
+			{ID: "s_b", Nome: "B", Icona: "uscita", Ordine: 2, Share: config.Share{Percorso: `\\srv\sds\B`, Password: enc("s_b")}},
+		}
+		return nil
+	})
+	h.sc.ScanOnce(context.Background())
+	h.sc.ScanOnce(context.Background())
+	return h, c, mt
+}
+
+func manifestOf(t *testing.T, h *harness, c *http.Client) map[string]any {
+	t.Helper()
+	r := h.do(c, "GET", "/manifest.json", nil)
+	if r.code != 200 {
+		t.Fatal(r.code, string(r.raw))
+	}
+	return r.body
+}
+
+func TestDepartmentsAndExtras(t *testing.T) {
+	h, c, mt := extrasHarness(t)
+	// la connessione di prova usa il percorso \\srv\sds: le sottocartelle A e B sono sezioni
+	M := func(method, path string, body any) resp { return h.do(c, method, path, body, MaintHeader, mt) }
+	m := manifestOf(t, h, c)
+	if len(m["documents"].([]any)) != 3 || m["role"] != "totem" || m["screensaver"] == nil {
+		t.Fatal(m)
+	}
+	h1 := m["hash"].(string)
+
+	// reparti
+	if r := M("PUT", "/api/maint/departments", map[string]any{"reparti": []map[string]any{{"nome": "Reparto A", "sezioni": []string{"s_a"}}, {"nome": "reparto a"}}}); r.code != 400 {
+		t.Fatal("nomi duplicati accettati", string(r.raw))
+	}
+	if r := M("PUT", "/api/maint/departments", map[string]any{"reparti": []map[string]any{{"nome": "Reparto A", "sezioni": []string{"s_a"}}, {"nome": "Magazzino"}}}); r.code != 200 {
+		t.Fatal(string(r.raw))
+	}
+	ex := M("GET", "/api/maint/extras", nil).body
+	reps := ex["reparti"].([]any)
+	repA := reps[0].(map[string]any)["id"].(string)
+	repM := reps[1].(map[string]any)["id"].(string)
+
+	// numeri utili e avvisi, comuni e di reparto
+	r := M("PUT", "/api/maint/contacts", map[string]any{"contatti": []map[string]any{
+		{"etichetta": "Emergenze", "numero": "112"},
+		{"etichetta": "Primo soccorso reparto A", "numero": "3210", "reparti": []string{repA}},
+	}})
+	if r.code != 200 {
+		t.Fatal(string(r.raw))
+	}
+	if r := M("PUT", "/api/maint/contacts", map[string]any{"contatti": []map[string]any{{"etichetta": "x", "numero": "abc"}}}); r.code != 400 || r.body["field"] != "numero" {
+		t.Fatal(string(r.raw))
+	}
+	r = M("PUT", "/api/maint/notices", map[string]any{"avvisi": []map[string]any{
+		{"testo": "Esercitazione antincendio giovedì", "livello": "attenzione", "dal": "2026-10-20", "al": "2026-10-30"},
+		{"testo": "Scaduto", "livello": "info", "al": "2026-10-01"},
+		{"testo": "Solo magazzino", "livello": "info", "reparti": []string{repM}},
+	}})
+	if r.code != 200 {
+		t.Fatal(string(r.raw))
+	}
+	if r := M("PUT", "/api/maint/screensaver", map[string]any{"attivo": true, "dopoMinuti": 4, "notte": true, "orarioNero": "21:00-05:30"}); r.code != 200 {
+		t.Fatal(string(r.raw))
+	}
+
+	// totem senza reparto: tutte le sezioni, solo numeri e avvisi comuni non scaduti
+	m = manifestOf(t, h, c)
+	if m["hash"] == h1 {
+		t.Fatal("hash invariato dopo avvisi e numeri")
+	}
+	if len(m["contacts"].([]any)) != 1 || len(m["notices"].([]any)) != 1 || m["department"] != nil {
+		t.Fatal(m["contacts"], m["notices"])
+	}
+	ss := m["screensaver"].(map[string]any)
+	if ss["enabled"] != true || ss["afterMinutes"].(float64) != 4 || ss["nightHours"] != "21:00-05:30" {
+		t.Fatal(ss)
+	}
+
+	// totem assegnato al reparto A: solo la sezione A e il numero del reparto
+	devID := h.cfg.Get().Globali.Dispositivi[0].ID
+	if r := M("PUT", "/api/maint/devices/"+devID, map[string]any{"reparto": repA}); r.code != 200 {
+		t.Fatal(string(r.raw))
+	}
+	m = manifestOf(t, h, c)
+	if len(m["sections"].([]any)) != 1 || len(m["documents"].([]any)) != 2 || m["department"].(map[string]any)["name"] != "Reparto A" {
+		t.Fatal(m["sections"], m["department"])
+	}
+	if len(m["contacts"].([]any)) != 2 {
+		t.Fatal(m["contacts"])
+	}
+	st := h.do(c, "GET", "/api/status", nil).body
+	if len(st["sections"].([]any)) != 1 {
+		t.Fatal("stato non filtrato per reparto")
+	}
+	if r := M("PUT", "/api/maint/devices/"+devID, map[string]any{"reparto": "r_manca"}); r.code != 400 {
+		t.Fatal(r.code)
+	}
+
+	// eliminare la sezione o il reparto ripulisce i riferimenti
+	M("DELETE", "/api/maint/sections/s_a", nil)
+	if dep, _ := h.cfg.Get().Department(repA); len(dep.Sezioni) != 0 {
+		t.Fatal(dep)
+	}
+	M("PUT", "/api/maint/departments", map[string]any{"reparti": []map[string]any{{"id": repM, "nome": "Magazzino"}}})
+	cfg := h.cfg.Get()
+	if cfg.Globali.Dispositivi[0].Reparto != "" || len(cfg.Globali.Contatti[1].Reparti) != 0 {
+		t.Fatal("riferimenti al reparto eliminato rimasti")
+	}
+}
+
+func TestTotemCodesAndReplacement(t *testing.T) {
+	h, c, mt := extrasHarness(t)
+	M := func(method, path string, body any) resp { return h.do(c, method, path, body, MaintHeader, mt) }
+	M("PUT", "/api/maint/departments", map[string]any{"reparti": []map[string]any{{"nome": "Magazzino", "sezioni": []string{"s_b"}}}})
+	repM := h.cfg.Get().Reparti[0].ID
+
+	// secondo totem per il magazzino
+	r := M("POST", "/api/maint/totems/pair-code", map[string]any{"reparto": repM})
+	if r.code != 200 {
+		t.Fatal(string(r.raw))
+	}
+	t2 := h.client()
+	r = h.do(t2, "POST", "/api/setup/code", map[string]any{"code": r.body["code"], "platform": "android"})
+	if r.code != 200 || r.body["role"] != "totem" || r.body["department"] != "Magazzino" {
+		t.Fatal(string(r.raw))
+	}
+	if m := manifestOf(t, h, t2); len(m["documents"].([]any)) != 1 {
+		t.Fatal("il totem del magazzino vede tutto")
+	}
+	if m := manifestOf(t, h, c); len(m["documents"].([]any)) != 3 {
+		t.Fatal("il primo totem ha perso documenti")
+	}
+	// il secondo totem entra in manutenzione con lo stesso PIN
+	if r := h.do(t2, "POST", "/api/maint/login", map[string]any{"pin": "1234"}); r.code != 200 {
+		t.Fatal(r.code)
+	}
+
+	// sostituzione del totem del magazzino: il nuovo eredita il reparto, il vecchio è fuori
+	var oldID string
+	for _, d := range h.cfg.Get().Globali.Dispositivi {
+		if d.Reparto == repM {
+			oldID = d.ID
+		}
+	}
+	r = M("POST", "/api/maint/totems/pair-code", map[string]any{"sostituisce": oldID})
+	t3 := h.client()
+	r = h.do(t3, "POST", "/api/setup/code", map[string]any{"code": r.body["code"]})
+	if r.code != 200 || r.body["department"] != "Magazzino" {
+		t.Fatal(string(r.raw))
+	}
+	if r := h.do(t2, "GET", "/api/status", nil); r.code != 401 {
+		t.Fatal("totem sostituito ancora valido")
+	}
+	if n := len(h.cfg.Get().Globali.Dispositivi); n != 2 {
+		t.Fatal(n)
+	}
+	if r := M("POST", "/api/maint/totems/pair-code", map[string]any{"reparto": "inesistente"}); r.code != 400 {
+		t.Fatal(r.code)
+	}
+	// codice dal listener interno, reparto indicato per nome
+	in := httptest.NewServer(h.srv.InternalHandler())
+	defer in.Close()
+	rr, _ := http.Post(in.URL+"/internal/pair-totem?reparto=magazzino", "application/json", nil)
+	if rr.StatusCode != 200 {
+		t.Fatal(rr.StatusCode)
+	}
+}
+
+func TestMonitor(t *testing.T) {
+	h, c, mt := extrasHarness(t)
+	M := func(method, path string, body any) resp { return h.do(c, method, path, body, MaintHeader, mt) }
+	anon := h.client()
+	if r := h.do(anon, "GET", "/api/monitor", nil); r.code != 404 {
+		t.Fatal("monitoraggio attivo senza token", r.code)
+	}
+	tok := M("POST", "/api/maint/monitor/token", map[string]any{}).body["token"].(string)
+	if r := h.do(anon, "GET", "/api/monitor", nil, "Authorization", "Bearer sbagliato"); r.code != 401 {
+		t.Fatal(r.code)
+	}
+	r := h.do(anon, "GET", "/api/monitor", nil, "Authorization", "Bearer "+tok)
+	if r.code != 200 || r.body["ok"] != true || len(r.body["sections"].([]any)) != 2 || len(r.body["totems"].([]any)) != 1 {
+		t.Fatal(string(r.raw))
+	}
+	r = h.do(anon, "GET", "/api/monitor?formato=testo&token="+tok, nil)
+	if r.code != 200 || !strings.HasPrefix(string(r.raw), "TOTEM OK\n") {
+		t.Fatal(string(r.raw))
+	}
+	// totem silenzioso oltre la soglia → 503
+	if r := M("PUT", "/api/maint/monitor", map[string]any{"sogliaMinuti": 5}); r.code != 400 {
+		t.Fatal("soglia troppo bassa accettata")
+	}
+	M("PUT", "/api/maint/monitor", map[string]any{"sogliaMinuti": 15})
+	h.clk.Add(20 * time.Minute)
+	r = h.do(anon, "GET", "/api/monitor?formato=testo", nil, "Authorization", "Bearer "+tok)
+	if r.code != 503 || !strings.Contains(string(r.raw), "silenzioso da 20 minuti") {
+		t.Fatal(r.code, string(r.raw))
+	}
+	// un heartbeat lo rimette a posto
+	h.do(c, "POST", "/api/heartbeat", map[string]any{"appVersion": "1", "platform": "windows"})
+	if r := h.do(anon, "GET", "/api/monitor", nil, "Authorization", "Bearer "+tok); r.code != 200 {
+		t.Fatal(r.code, string(r.raw))
+	}
+	// token revocato (la manutenzione è scaduta nei 20 minuti simulati: nuovo login)
+	mt2 := h.do(c, "POST", "/api/maint/login", map[string]any{"pin": "1234"}).body["token"].(string)
+	if r := h.do(c, "DELETE", "/api/maint/monitor/token", nil, MaintHeader, mt2); r.code != 200 {
+		t.Fatal(r.code)
+	}
+	if r := h.do(anon, "GET", "/api/monitor", nil, "Authorization", "Bearer "+tok); r.code != 404 {
+		t.Fatal(r.code)
+	}
+	// il listener interno risponde senza token
+	in := httptest.NewServer(h.srv.InternalHandler())
+	defer in.Close()
+	rr, _ := http.Get(in.URL + "/internal/monitor?formato=testo")
+	b, _ := io.ReadAll(rr.Body)
+	if !strings.HasPrefix(string(b), "TOTEM OK") {
+		t.Fatal(string(b))
 	}
 }

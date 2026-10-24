@@ -30,13 +30,19 @@ const (
 )
 
 type pairGrant struct {
-	role    string
-	name    string
-	expires time.Time
+	role     string
+	name     string
+	reparto  string // solo totem
+	replaces string // solo totem: id del totem da sostituire
+	expires  time.Time
 }
 
 // newPairCode crea un codice monouso per il ruolo indicato.
 func (s *Server) newPairCode(role, name string, ttl time.Duration) string {
+	return s.newPairCodeGrant(pairGrant{role: role, name: name}, ttl)
+}
+
+func (s *Server) newPairCodeGrant(g pairGrant, ttl time.Duration) string {
 	code := auth.NormalizeCode(auth.NewSetupCode())
 	now := s.o.Now()
 	s.mu.Lock()
@@ -45,7 +51,8 @@ func (s *Server) newPairCode(role, name string, ttl time.Duration) string {
 			delete(s.pairCodes, k)
 		}
 	}
-	s.pairCodes[code] = pairGrant{role: role, name: name, expires: now.Add(ttl)}
+	g.expires = now.Add(ttl)
+	s.pairCodes[code] = g
 	s.mu.Unlock()
 	return code
 }
@@ -65,18 +72,36 @@ func (s *Server) takePairCode(code, role string) (pairGrant, bool) {
 
 // registerDevice aggiunge un dispositivo (non totem) e imposta il suo cookie.
 func (s *Server) registerDevice(w http.ResponseWriter, role, name, platform string) (config.Device, error) {
+	return s.registerGrant(w, pairGrant{role: role, name: name}, platform)
+}
+
+// registerGrant registra il dispositivo descritto da un codice; un totem di sostituzione
+// prende il posto (e il reparto) di quello indicato.
+func (s *Server) registerGrant(w http.ResponseWriter, g pairGrant, platform string) (config.Device, error) {
 	tok := auth.NewToken()
 	now := s.o.Now().UTC()
-	dev := config.Device{ID: auth.NewID("d"), Nome: name, Ruolo: role, Piattaforma: validPlatform(platform),
+	dev := config.Device{ID: auth.NewID("d"), Nome: g.name, Ruolo: g.role, Reparto: g.reparto, Piattaforma: validPlatform(platform),
 		TokenHash: auth.HashToken(tok), Creato: now, UltimoContatto: now}
 	if err := s.o.Config.Update(func(c *config.Config) error {
+		if _, ok := c.Department(dev.Reparto); !ok {
+			dev.Reparto = "" // reparto eliminato nel frattempo
+		}
+		if g.replaces != "" {
+			for i, d := range c.Globali.Dispositivi {
+				if d.ID == g.replaces {
+					c.Globali.Dispositivi = append(c.Globali.Dispositivi[:i], c.Globali.Dispositivi[i+1:]...)
+					break
+				}
+			}
+		}
 		c.Globali.Dispositivi = append(c.Globali.Dispositivi, dev)
 		return nil
 	}); err != nil {
 		return dev, err
 	}
 	s.setDeviceCookie(w, tok)
-	s.o.Logger.Info("dispositivo abbinato", "dispositivo", dev.ID, "ruolo", role, "nome", name, "piattaforma", dev.Piattaforma)
+	s.o.Logger.Info("dispositivo abbinato", "dispositivo", dev.ID, "ruolo", dev.Ruolo, "nome", dev.Nome, "reparto", dev.Reparto,
+		"sostituisce", g.replaces, "piattaforma", dev.Piattaforma)
 	return dev, nil
 }
 
@@ -110,21 +135,123 @@ func (s *Server) StationCode(nome string) string {
 	return code
 }
 
-// pairStation è chiamata dalla procedura guidata quando il codice inserito è un codice
-// di postazione. Restituisce true se ha risposto.
-func (s *Server) pairStation(w http.ResponseWriter, code, platform string) bool {
+// pairByCode è chiamata dalla procedura guidata quando il codice inserito è un codice di
+// postazione o di un nuovo totem. Restituisce true se ha risposto.
+func (s *Server) pairByCode(w http.ResponseWriter, code, platform string) bool {
 	g, ok := s.takePairCode(code, RoleStation)
 	if !ok {
-		return false
+		if g, ok = s.takePairCode(code, RoleTotem); !ok {
+			return false
+		}
 	}
 	s.codeLimiter.Success()
-	dev, err := s.registerDevice(w, RoleStation, g.name, platform)
+	dev, err := s.registerGrant(w, g, platform)
 	if err != nil {
 		jsonErr(w, http.StatusInternalServerError, "save")
 		return true
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"paired": true, "role": RoleStation, "deviceId": dev.ID, "name": dev.Nome})
+	out := map[string]any{"paired": true, "role": dev.Ruolo, "deviceId": dev.ID, "name": dev.Nome}
+	s.o.Config.View(func(c *config.Config) {
+		if d, ok := c.Department(dev.Reparto); ok {
+			out["department"] = d.Nome
+		}
+	})
+	writeJSON(w, http.StatusOK, out)
 	return true
+}
+
+// ---------------------------------------------------------------------------
+// Totem aggiuntivi e sostituzioni
+
+// totemCode genera il codice per aggiungere un totem a un reparto o per sostituirne uno.
+func (s *Server) totemCode(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Reparto     string `json:"reparto"`
+		Sostituisce string `json:"sostituisce"`
+	}
+	if !readJSON(w, r, &req) {
+		return
+	}
+	code, err := s.TotemCode(req.Reparto, req.Sostituisce)
+	if err != nil {
+		jsonErr(w, http.StatusBadRequest, "invalid")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"code": code, "expiresInSec": int(stationCodeTTL.Seconds())})
+}
+
+// TotemCode genera un codice di totem (anche dal listener interno). reparto accetta
+// l'id o il nome; con sostituisce il nuovo totem eredita il reparto di quello vecchio.
+func (s *Server) TotemCode(reparto, sostituisce string) (string, error) {
+	g := pairGrant{role: RoleTotem, name: "totem"}
+	var err error
+	s.o.Config.View(func(c *config.Config) {
+		if sostituisce != "" {
+			for _, d := range c.Globali.Dispositivi {
+				if d.ID == sostituisce && d.Ruolo == RoleTotem {
+					g.replaces, g.reparto, g.name = d.ID, d.Reparto, d.Nome
+					return
+				}
+			}
+			err = errNotFound
+			return
+		}
+		if reparto != "" {
+			for _, d := range c.Reparti {
+				if d.ID == reparto || strings.EqualFold(d.Nome, reparto) {
+					g.reparto = d.ID
+					g.name = "totem " + d.Nome
+					return
+				}
+			}
+			err = errNotFound
+		}
+	})
+	if err != nil {
+		return "", err
+	}
+	s.o.Logger.Info("codice di totem generato", "reparto", g.reparto, "sostituisce", g.replaces)
+	return s.newPairCodeGrant(g, stationCodeTTL), nil
+}
+
+// updateDevice cambia nome o reparto di un dispositivo.
+func (s *Server) updateDevice(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	var req struct {
+		Nome    *string `json:"nome"`
+		Reparto *string `json:"reparto"`
+	}
+	if !readJSON(w, r, &req) {
+		return
+	}
+	err := s.o.Config.Update(func(c *config.Config) error {
+		for i := range c.Globali.Dispositivi {
+			d := &c.Globali.Dispositivi[i]
+			if d.ID != id {
+				continue
+			}
+			if req.Nome != nil {
+				d.Nome = cleanName(*req.Nome, d.Nome)
+			}
+			if req.Reparto != nil {
+				if _, ok := c.Department(*req.Reparto); !ok && *req.Reparto != "" {
+					return &config.ValidationError{Field: "reparto", Msg: "reparto inesistente"}
+				}
+				d.Reparto = *req.Reparto
+			}
+			return nil
+		}
+		return errNotFound
+	})
+	if errors.Is(err, errNotFound) {
+		jsonErr(w, http.StatusNotFound, "not_found")
+		return
+	}
+	if err != nil {
+		validationResponse(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
 // ---------------------------------------------------------------------------
@@ -167,6 +294,8 @@ type deviceOut struct {
 	ID             string    `json:"id"`
 	Nome           string    `json:"nome"`
 	Ruolo          string    `json:"ruolo"`
+	Reparto        string    `json:"reparto"`
+	RepartoNome    string    `json:"repartoNome"`
 	Piattaforma    string    `json:"piattaforma"`
 	Creato         time.Time `json:"creato"`
 	UltimoContatto time.Time `json:"ultimoContatto"`
@@ -195,8 +324,11 @@ func (s *Server) listDevices(w http.ResponseWriter, r *http.Request) {
 	out := []deviceOut{}
 	s.o.Config.View(func(c *config.Config) {
 		for _, d := range c.Globali.Dispositivi {
-			o := deviceOut{ID: d.ID, Nome: d.Nome, Ruolo: d.Ruolo, Piattaforma: d.Piattaforma, Creato: d.Creato,
+			o := deviceOut{ID: d.ID, Nome: d.Nome, Ruolo: d.Ruolo, Reparto: d.Reparto, Piattaforma: d.Piattaforma, Creato: d.Creato,
 				UltimoContatto: d.UltimoContatto, Corrente: d.ID == me}
+			if dep, ok := c.Department(d.Reparto); ok {
+				o.RepartoNome = dep.Nome
+			}
 			if hb, ok := hbs[d.ID]; ok {
 				o.AppVersion = hb.AppVersion
 				if !hb.LastSync.IsZero() {
@@ -219,8 +351,9 @@ func (s *Server) listDevices(w http.ResponseWriter, r *http.Request) {
 
 var errSelf = errors.New("non si può revocare il dispositivo in uso")
 
-// revokeDevice revoca una postazione o un telefono. Il totem si sostituisce solo con
-// reset-pairing; il dispositivo in uso non si revoca da sé.
+// revokeDevice revoca un dispositivo, totem compresi; il dispositivo in uso non si revoca
+// da sé. Per sostituire un totem conviene il codice di sostituzione, che ne conserva il
+// reparto.
 func (s *Server) revokeDevice(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if id == deviceFrom(r).ID {
@@ -229,7 +362,7 @@ func (s *Server) revokeDevice(w http.ResponseWriter, r *http.Request) {
 	}
 	err := s.o.Config.Update(func(c *config.Config) error {
 		for i, d := range c.Globali.Dispositivi {
-			if d.ID == id && d.Ruolo != RoleTotem {
+			if d.ID == id {
 				c.Globali.Dispositivi = append(c.Globali.Dispositivi[:i], c.Globali.Dispositivi[i+1:]...)
 				return nil
 			}

@@ -245,6 +245,69 @@ usano cartelle di prova sulle share.
 
 ---
 
+## Reparti, numeri utili, avvisi, salvaschermo, monitoraggio
+
+Tutto si imposta da **Area manutenzione → Altre impostazioni** (sul totem o da una
+postazione). I dati arrivano ai totem con la sincronizzazione e funzionano anche offline.
+
+### Più totem e reparti
+
+- **Reparti** (facoltativi): un reparto ha un nome e le sezioni che vede; senza sezioni
+  scelte vede tutto. Senza reparti tutti i totem vedono tutto, come prima.
+- **Aggiungere un totem:** Dispositivi → **Aggiungi totem** → scegliere il reparto →
+  **Genera codice**. Sul nuovo dispositivo: indirizzo del totem → "Inizia configurazione" →
+  codice. Dal server: `docker compose exec totem /totem abbina-totem --reparto "Magazzino"`.
+  Tutti i totem usano lo stesso PIN.
+- **Spostare un totem di reparto:** Dispositivi → menu "Reparto" sulla riga del totem.
+- **Sostituire un totem** (guasto, passaggio da PC a tablet): Dispositivi → **Sostituisci**
+  sulla riga del totem → codice da usare sul dispositivo nuovo, che eredita nome e reparto.
+  Il vecchio smette di aggiornarsi (i documenti già scaricati restano leggibili).
+- I reparti decidono **cosa si mostra**, non sono un confine di sicurezza: tutti i
+  dispositivi abbinati sono considerati fidati.
+
+### Numeri utili
+
+Fino a 8 numeri (descrizione e numero), per tutti i reparti o solo per alcuni. Compaiono a
+destra nella fascia rossa EMERGENZA della Home e nel salvaschermo. Se non ci sono sezioni
+di emergenza, la fascia compare comunque con i soli numeri.
+
+### Avvisi
+
+Fino a 10 messaggi (massimo 200 caratteri) di tipo **Avviso** o **Attenzione**, con date di
+inizio e fine incluse (facoltative) e reparti. Compaiono sotto la ricerca in Home; il
+totem controlla le date da sé, anche offline. Gli avvisi scaduti spariscono da soli.
+
+### Salvaschermo
+
+Solo sui totem (non sulle postazioni). Dopo N minuti senza interazioni (default 5) mostra a
+tutto schermo ora, numeri utili e avvisi. Facoltativo lo **schermo nero fuori orario**
+(default 20:00-06:00) con la sola ora, attenuata. Il contenuto si sposta un poco ogni
+minuto per non segnare lo schermo. Un tocco o un tasto lo chiude, senza attivare quello che
+sta sotto. Per spegnere davvero la retroilluminazione usare gli orari di Fully Kiosk
+(tablet) o di Windows (PC).
+
+### Monitoraggio
+
+Monitoraggio → **Genera token**: il token si mostra una volta sola. Poi:
+
+```sh
+curl -H "Authorization: Bearer <token>" https://totem.azienda.it/api/monitor               # JSON
+curl -H "Authorization: Bearer <token>" "https://totem.azienda.it/api/monitor?formato=testo"
+```
+
+- **HTTP 200** se tutto va; **HTTP 503** se una sezione non è leggibile dal server o un
+  totem non si fa vivo da più della soglia (default 30 minuti, modificabile). I documenti
+  scartati compaiono come avvisi ma non danno errore.
+- In formato testo la prima riga è `TOTEM OK` o `TOTEM ERRORE`: in **Uptime Kuma** basta un
+  monitor HTTP(s) con l'header `Authorization` (o una parola chiave `TOTEM OK`).
+- Il token si può passare anche come `?token=…`, ma finisce nei log del proxy: meglio l'header.
+- Se i totem si spengono di notte, alzare la soglia o mettere il monitor in pausa nelle ore
+  di spegnimento.
+- Sul server, senza token: `docker compose exec totem /totem stato` (uscita 1 se c'è un
+  errore, utile in uno script).
+
+---
+
 ## 4. Aggiornamento e rollback
 
 Le immagini si pubblicano su `ghcr.io/toigoweb/totem` con i tag `X.Y.Z`, `X.Y` e `X`. Il

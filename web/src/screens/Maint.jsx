@@ -119,9 +119,17 @@ export function Maint() {
             <Icon name="piu" />{S.addSection.replace('+ ', '')}
           </button>
           {rows.length >= max && <span class="piccolo">{S.maxSections(max)}</span>}
-          <button class="btn" disabled={ro} onClick={() => go('changePin')}><Icon name="lucchetto" />{S.changePin}</button>
+        </div>
+        <h2 class="blocco-tit">{S.moreSettings}</h2>
+        <div class={`griglia-btn ${ro ? 'disattivo' : ''}`}>
           <button class="btn" disabled={ro} data-testid="open-devices" onClick={() => go('devices')}><Icon name="ingranaggio" />{S.devices}</button>
+          <button class="btn" disabled={ro} data-testid="open-departments" onClick={() => go('departments')}><Icon name="mappa" />{S.departments}</button>
+          <button class="btn" disabled={ro} data-testid="open-contacts" onClick={() => go('contacts')}><Icon name="croce" />{S.usefulNumbers}</button>
+          <button class="btn" disabled={ro} data-testid="open-notices" onClick={() => go('notices')}><Icon name="info" />{S.noticesTitle}</button>
+          <button class="btn" disabled={ro} data-testid="open-screensaver" onClick={() => go('screensaverSettings')}><Icon name="orologio" />{S.screensaverTitle}</button>
           <button class="btn" disabled={ro} data-testid="open-problems" onClick={() => go('problems')}><Icon name="avviso" />{S.problems}</button>
+          <button class="btn" disabled={ro} data-testid="open-monitoring" onClick={() => go('monitoring')}><Icon name="sync" />{S.monitorTitle}</button>
+          <button class="btn" disabled={ro} onClick={() => go('changePin')}><Icon name="lucchetto" />{S.changePin}</button>
         </div>
       </div>
       {confirm && (

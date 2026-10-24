@@ -77,6 +77,24 @@ svg.i { width: 1.2em; height: 1.2em; flex: none; fill: none; stroke: currentColo
 .emergenza .tit { display: flex; align-items: center; gap: 12px; font-family: var(--f-titoli); font-weight: 700; font-size: 1.6rem; letter-spacing: .08em; }
 .emergenza .tit svg { width: 1.6em; height: 1.6em; }
 .emergenza .btn { background: var(--bianco); color: var(--rosso); border-color: var(--bianco); min-height: 64px; font-size: 1.05rem; }
+.numeri { list-style: none; margin: 0 0 0 auto; padding: 0; display: flex; flex-wrap: wrap; gap: 8px 22px; justify-content: flex-end; }
+.numeri li { display: flex; flex-direction: column; line-height: 1.15; }
+.numeri .num { font-family: var(--f-titoli); font-weight: 700; font-size: 1.5rem; letter-spacing: .03em; }
+.numeri .lab { font-size: .9rem; }
+.banner.info { background: var(--bianco); }
+
+/* salvaschermo */
+.salvaschermo { position: fixed; inset: 0; z-index: 50; background: var(--navy); color: var(--bianco); display: grid; place-items: center; cursor: pointer; }
+.salvaschermo.nero { background: #000; }
+.salvaschermo .c { display: grid; gap: 28px; justify-items: center; text-align: center; max-width: 900px; padding: 24px; transition: transform 1s; }
+.salvaschermo h1 { margin: 0; font-family: var(--f-titoli); font-size: 2.4rem; }
+.salvaschermo .ora { font-family: var(--f-titoli); font-size: 4rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.salvaschermo.nero .ora { color: #5a6573; font-size: 2rem; }
+.salvaschermo .em { background: var(--rosso); border-radius: 12px; padding: 18px 28px; display: grid; gap: 12px; }
+.salvaschermo .em .tit { font-family: var(--f-titoli); font-weight: 700; font-size: 1.6rem; letter-spacing: .08em; display: flex; gap: 12px; align-items: center; justify-content: center; }
+.salvaschermo .numeri { justify-content: center; margin: 0; }
+.salvaschermo .banner { color: var(--navy); text-align: left; }
+.salvaschermo .tocca { font-size: 1.1rem; display: flex; gap: 10px; align-items: center; opacity: .85; }
 
 .griglia { display: grid; gap: 16px; }
 .tile { min-height: 200px; background: var(--navy); color: var(--bianco); border-radius: 12px; padding: 22px; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; gap: 10px; cursor: pointer; border: 0; text-align: left; }
@@ -282,3 +300,9 @@ th { font-family: var(--f-titoli); font-weight: 600; text-transform: uppercase; 
   .icone10 { grid-template-columns: repeat(5, minmax(56px, 1fr)); }
   .form { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* righe modificabili (reparti, numeri utili, avvisi) */
+.riga-ed { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: start; padding: 14px 0; border-bottom: 2px solid var(--grigio-chiaro); }
+.griglia-btn { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+.griglia-btn .btn { justify-content: flex-start; }
+select.input { appearance: auto; }

@@ -41,6 +41,7 @@ test('postazione abbinata dalla manutenzione: il totem resta abbinato', async ({
   await page.getByTestId('open-devices').click();
   await expect(page.getByTestId('device-row')).toHaveCount(1);
   await page.getByRole('button', { name: "Abbina un'altra postazione" }).click();
+  await expect(page.getByTestId('pair-station')).toContainText("Abbina un'altra postazione");
   await page.fill('#st-nome', 'PC ufficio IT');
   await page.getByTestId('gen-code').click();
   const code = await page.getByTestId('station-code').locator('[data-code]').getAttribute('data-code');
@@ -60,7 +61,7 @@ test('postazione abbinata dalla manutenzione: il totem resta abbinato', async ({
   await st.page.getByTestId('open-devices').click();
   await expect(st.page.getByTestId('device-row')).toHaveCount(2);
   await expect(st.page.getByTestId('device-row').filter({ hasText: 'PC ufficio IT' })).toContainText('Questo dispositivo');
-  await expect(st.page.getByTestId('device-row').filter({ hasText: 'Totem' })).toContainText('reset-pairing');
+  await expect(st.page.getByTestId('device-row').filter({ hasText: 'Totem' }).getByRole('button', { name: 'Sostituisci' })).toBeVisible();
 
   // il totem revoca la postazione
   await openMaint(page);

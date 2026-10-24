@@ -56,10 +56,11 @@ type Options struct {
 type Server struct {
 	o Options
 
-	pinLimiter  *auth.Limiter
-	codeLimiter *auth.Limiter
-	maint       *auth.Sessions // valore: id del dispositivo
-	setup       *auth.Sessions // valore: "setup"
+	pinLimiter     *auth.Limiter
+	codeLimiter    *auth.Limiter
+	monitorLimiter *auth.Limiter
+	maint          *auth.Sessions // valore: id del dispositivo
+	setup          *auth.Sessions // valore: "setup"
 
 	mu        sync.Mutex
 	setupCode string               // vuoto se il totem è già abbinato
@@ -80,13 +81,15 @@ func New(o Options) *Server {
 		o:           o,
 		pinLimiter:  auth.NewLimiter(o.Settings.PinAttempts, o.Settings.PinLockout),
 		codeLimiter: auth.NewLimiter(o.Settings.PinAttempts, o.Settings.PinLockout),
-		maint:       auth.NewSessions(o.Settings.MaintenanceIdle, 0),
-		setup:       auth.NewSessions(15*time.Minute, 30*time.Minute),
-		tests:       map[string]testGrant{},
-		pairCodes:   map[string]pairGrant{},
-		lastSeen:    map[string]time.Time{},
+		// il monitoraggio interroga spesso: blocco solo dopo molti token sbagliati
+		monitorLimiter: auth.NewLimiter(20, o.Settings.PinLockout),
+		maint:          auth.NewSessions(o.Settings.MaintenanceIdle, 0),
+		setup:          auth.NewSessions(15*time.Minute, 30*time.Minute),
+		tests:          map[string]testGrant{},
+		pairCodes:      map[string]pairGrant{},
+		lastSeen:       map[string]time.Time{},
 	}
-	s.pinLimiter.Now, s.codeLimiter.Now = o.Now, o.Now
+	s.pinLimiter.Now, s.codeLimiter.Now, s.monitorLimiter.Now = o.Now, o.Now, o.Now
 	s.maint.Now, s.setup.Now = o.Now, o.Now
 	return s
 }
@@ -125,6 +128,19 @@ func (s *Server) Handler() http.Handler {
 	m.Handle("GET /api/maint/devices", s.maintOnly(http.HandlerFunc(s.listDevices)))
 	m.Handle("DELETE /api/maint/devices/{id}", s.maintOnly(http.HandlerFunc(s.revokeDevice)))
 	m.Handle("GET /api/maint/problems", s.maintOnly(http.HandlerFunc(s.problems)))
+	m.Handle("POST /api/maint/totems/pair-code", s.maintOnly(http.HandlerFunc(s.totemCode)))
+	m.Handle("PUT /api/maint/devices/{id}", s.maintOnly(http.HandlerFunc(s.updateDevice)))
+
+	// reparti, numeri utili, avvisi, salvaschermo, monitoraggio
+	m.Handle("GET /api/maint/extras", s.maintOnly(http.HandlerFunc(s.getExtras)))
+	m.Handle("PUT /api/maint/departments", s.maintOnly(http.HandlerFunc(s.putDepartments)))
+	m.Handle("PUT /api/maint/contacts", s.maintOnly(http.HandlerFunc(s.putContacts)))
+	m.Handle("PUT /api/maint/notices", s.maintOnly(http.HandlerFunc(s.putNotices)))
+	m.Handle("PUT /api/maint/screensaver", s.maintOnly(http.HandlerFunc(s.putScreensaver)))
+	m.Handle("POST /api/maint/monitor/token", s.maintOnly(http.HandlerFunc(s.newMonitorToken)))
+	m.Handle("DELETE /api/maint/monitor/token", s.maintOnly(http.HandlerFunc(s.deleteMonitorToken)))
+	m.Handle("PUT /api/maint/monitor", s.maintOnly(http.HandlerFunc(s.putMonitor)))
+	m.HandleFunc("GET /api/monitor", s.monitor)
 
 	// fase 2: telefoni (404 finché globali.fase2 è false)
 	m.Handle("POST /api/maint/devices/pair-code", s.phase2(s.maintOnly(http.HandlerFunc(s.pairCode))))

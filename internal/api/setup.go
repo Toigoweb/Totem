@@ -75,8 +75,14 @@ func (s *Server) setupState(w http.ResponseWriter, r *http.Request) {
 		pinSet, totem, sections = c.Globali.PinHash != "", hasTotem(c), len(c.Sezioni)
 	})
 	d, paired := s.lookupDevice(r)
+	depName := ""
+	s.o.Config.View(func(c *config.Config) {
+		if dep, ok := c.Department(d.Reparto); ok {
+			depName = dep.Nome
+		}
+	})
 	writeJSON(w, http.StatusOK, map[string]any{
-		"paired": paired, "role": d.Ruolo, "totemRegistered": totem, "pinSet": pinSet, "sections": sections,
+		"paired": paired, "role": d.Ruolo, "department": depName, "totemRegistered": totem, "pinSet": pinSet, "sections": sections,
 		"serverVersion": s.o.Version,
 	})
 }
@@ -92,8 +98,9 @@ func (s *Server) setupCodeCheck(w http.ResponseWriter, r *http.Request) {
 	if lockedResponse(w, s.codeLimiter.Check(), s.o.Now()) {
 		return
 	}
-	// codice di una postazione: abbina questo browser come postazione, senza toccare il totem
-	if s.pairStation(w, req.Code, req.Platform) {
+	// codice di una postazione o di un totem aggiuntivo: abbina questo browser senza
+	// toccare gli altri dispositivi
+	if s.pairByCode(w, req.Code, req.Platform) {
 		return
 	}
 	s.mu.Lock()

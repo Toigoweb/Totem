@@ -17,7 +17,7 @@ import (
 )
 
 // SchemaVersion è la versione corrente del formato di config.json.
-const SchemaVersion = 1
+const SchemaVersion = 2
 
 // Icons è il set fisso delle 10 icone ammesse per le sezioni.
 var Icons = []string{"documento", "flacone", "scudo", "fiamma", "croce", "casco", "uscita", "mappa", "ingranaggio", "cartella"}
@@ -28,6 +28,7 @@ const MaxSections = 8
 type Config struct {
 	SchemaVersion int            `json:"schemaVersion"`
 	Sezioni       []Section      `json:"sezioni"`
+	Reparti       []Department   `json:"reparti"`
 	Globali       Globals        `json:"globali"`
 	Impostazioni  map[string]any `json:"impostazioni,omitempty"`
 }
@@ -49,15 +50,62 @@ type Share struct {
 }
 
 type Globals struct {
-	PinHash     string   `json:"pinHash,omitempty"`
-	Fase2       bool     `json:"fase2"`
-	Dispositivi []Device `json:"dispositivi"`
+	PinHash      string      `json:"pinHash,omitempty"`
+	Fase2        bool        `json:"fase2"`
+	Dispositivi  []Device    `json:"dispositivi"`
+	Contatti     []Contact   `json:"contatti"`
+	Avvisi       []Notice    `json:"avvisi"`
+	Salvaschermo Screensaver `json:"salvaschermo"`
+	Monitor      Monitor     `json:"monitor"`
+}
+
+// Department è un reparto: un gruppo di totem che vede solo alcune sezioni.
+// Sezioni vuoto = tutte le sezioni.
+type Department struct {
+	ID      string   `json:"id"`
+	Nome    string   `json:"nome"`
+	Sezioni []string `json:"sezioni"`
+}
+
+// Contact è un numero utile mostrato nella fascia EMERGENZA.
+// Reparti vuoto = tutti i reparti.
+type Contact struct {
+	ID        string   `json:"id"`
+	Etichetta string   `json:"etichetta"`
+	Numero    string   `json:"numero"`
+	Reparti   []string `json:"reparti"`
+}
+
+// Notice è un avviso temporaneo in Home. Dal e Al sono date "AAAA-MM-GG" incluse,
+// facoltative. Livello: "info" o "attenzione".
+type Notice struct {
+	ID      string   `json:"id"`
+	Testo   string   `json:"testo"`
+	Livello string   `json:"livello"`
+	Dal     string   `json:"dal,omitempty"`
+	Al      string   `json:"al,omitempty"`
+	Reparti []string `json:"reparti"`
+}
+
+// Screensaver regola il salvaschermo dei totem (non delle postazioni).
+type Screensaver struct {
+	Attivo     bool   `json:"attivo"`
+	DopoMinuti int    `json:"dopoMinuti"`
+	Notte      bool   `json:"notte"`      // schermo nero nell'orario notturno
+	OrarioNero string `json:"orarioNero"` // "HH:MM-HH:MM"
+}
+
+// Monitor è l'accesso alla pagina di stato per gli strumenti di monitoraggio.
+type Monitor struct {
+	TokenHash    string `json:"tokenHash,omitempty"`
+	SogliaMinuti int    `json:"sogliaMinuti"` // totem in errore se tace da più minuti
 }
 
 type Device struct {
 	ID             string    `json:"id"`
 	Nome           string    `json:"nome"`
-	Ruolo          string    `json:"ruolo"` // "totem" | "telefono"
+	Ruolo          string    `json:"ruolo"`             // "totem" | "postazione" | "telefono"
+	Reparto        string    `json:"reparto,omitempty"` // solo totem; vuoto = tutte le sezioni
 	Piattaforma    string    `json:"piattaforma"`
 	TokenHash      string    `json:"tokenHash"`
 	Creato         time.Time `json:"creato"`
@@ -74,6 +122,15 @@ func (c *Config) Clone() *Config {
 	}
 	if out.Globali.Dispositivi == nil {
 		out.Globali.Dispositivi = []Device{}
+	}
+	if out.Reparti == nil {
+		out.Reparti = []Department{}
+	}
+	if out.Globali.Contatti == nil {
+		out.Globali.Contatti = []Contact{}
+	}
+	if out.Globali.Avvisi == nil {
+		out.Globali.Avvisi = []Notice{}
 	}
 	return &out
 }
@@ -230,6 +287,9 @@ func migrate(b []byte, from int) ([]byte, error) {
 		switch v {
 		case 0:
 			// v0 = file scritto a mano senza schemaVersion: stessi campi della v1.
+		case 1:
+			// v2 aggiunge reparti, numeri utili, avvisi, salvaschermo e monitoraggio:
+			// campi nuovi con valori di default, nessuna trasformazione.
 		default:
 			return nil, fmt.Errorf("migrazione da schemaVersion %d non prevista", v)
 		}

@@ -164,6 +164,14 @@ export async function runSync(o) {
       manifest: { version: remote.version, hash: remote.hash, generatedAt: remote.generatedAt },
       sections: remote.sections,
       settings: remote.settings || {},
+      // dati del reparto: numeri utili, avvisi, salvaschermo (funzionano anche offline)
+      extras: {
+        role: remote.role || 'totem',
+        department: remote.department || null,
+        contacts: remote.contacts || [],
+        notices: remote.notices || [],
+        screensaver: remote.screensaver || null,
+      },
       lastSuccess: finishedAt.toISOString(),
       lastAttempt: startedAt.toISOString(),
       lastError: null,

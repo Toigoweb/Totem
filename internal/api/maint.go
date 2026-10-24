@@ -346,6 +346,7 @@ func (s *Server) deleteSection(w http.ResponseWriter, r *http.Request) {
 		for i := range c.Sezioni {
 			if c.Sezioni[i].ID == id {
 				c.Sezioni = append(c.Sezioni[:i], c.Sezioni[i+1:]...)
+				c.RemoveSectionRefs(id)
 				return nil
 			}
 		}

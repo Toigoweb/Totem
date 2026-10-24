@@ -25,6 +25,7 @@ export const app = createStore({
   history: [],
   sections: [],
   docs: [],
+  extras: { department: null, contacts: [], notices: [], screensaver: null },
   settings: {},
   meta: { lastSuccess: null, lastError: null, syncLog: [] },
   sync: { running: false, progress: null, lastError: null, online: true, nextAt: null },
@@ -73,14 +74,15 @@ export function back() {
 // Dati locali
 
 export async function reloadData() {
-  const [sections, settings, lastSuccess, lastError, syncLog, docs] = await Promise.all([
+  const [sections, settings, lastSuccess, lastError, syncLog, docs, extras] = await Promise.all([
     db.getMeta('sections'), db.getMeta('settings'), db.getMeta('lastSuccess'), db.getMeta('lastError'), db.getMeta('syncLog'),
-    visibleDocuments(db),
+    visibleDocuments(db), db.getMeta('extras'),
   ]);
   app.set({
     sections: (sections || []).slice().sort((a, b) => a.order - b.order),
     settings: settings || {},
     docs,
+    extras: { department: null, contacts: [], notices: [], screensaver: null, ...(extras || {}) },
     meta: { lastSuccess: lastSuccess || null, lastError: lastError || null, syncLog: syncLog || [] },
   });
 }
@@ -218,4 +220,16 @@ export function recentDocs(docs, recentDays = 30, now = new Date()) {
     .sort((a, b) => new Date(b.updated) - new Date(a.updated))
     .slice(0, 8)
     .map((d) => ({ ...d, badge: new Date(d.updated).getTime() - new Date(d.firstSeen).getTime() < 60000 ? 'new' : 'updated' }));
+}
+
+/** Data locale "AAAA-MM-GG". */
+export function localDay(d = new Date()) {
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
+/** Avvisi da mostrare oggi (le date sono incluse; il controllo è locale, vale offline). */
+export function activeNotices(notices, now = new Date()) {
+  const today = localDay(now);
+  return (notices || []).filter((n) => (!n.from || n.from <= today) && (!n.to || n.to >= today));
 }

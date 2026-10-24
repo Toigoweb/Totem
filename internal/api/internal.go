@@ -20,6 +20,17 @@ func (s *Server) InternalHandler() http.Handler {
 		code := s.StationCode(r.URL.Query().Get("nome"))
 		writeJSON(w, http.StatusOK, map[string]any{"code": code, "expiresInSec": int(stationCodeTTL.Seconds())})
 	})
+	m.HandleFunc("POST /internal/pair-totem", func(w http.ResponseWriter, r *http.Request) {
+		code, err := s.TotemCode(r.URL.Query().Get("reparto"), "")
+		if err != nil {
+			jsonErr(w, http.StatusNotFound, "reparto")
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"code": code, "expiresInSec": int(stationCodeTTL.Seconds())})
+	})
+	m.HandleFunc("GET /internal/monitor", func(w http.ResponseWriter, r *http.Request) {
+		writeMonitor(w, r, s.monitorReport())
+	})
 	m.HandleFunc("POST /internal/reset-pairing", func(w http.ResponseWriter, r *http.Request) {
 		code, err := s.ResetPairing(r.URL.Query().Get("reset-pin") == "1")
 		if err != nil {

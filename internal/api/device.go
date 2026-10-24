@@ -12,22 +12,6 @@ import (
 	"github.com/toigoweb/totem/internal/synclog"
 )
 
-func (s *Server) manifest(w http.ResponseWriter, r *http.Request) {
-	body, etag := s.o.Scanner.ManifestBody()
-	if body == nil {
-		jsonErr(w, http.StatusServiceUnavailable, "not_ready")
-		return
-	}
-	w.Header().Set("Cache-Control", "no-cache, private")
-	w.Header().Set("ETag", etag)
-	if r.Header.Get("If-None-Match") == etag {
-		w.WriteHeader(http.StatusNotModified)
-		return
-	}
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	_, _ = w.Write(body)
-}
-
 // file serve un PDF dall'archivio. Lo SHA viene validato e deve essere nel manifest:
 // nessun percorso arriva mai dal client.
 func (s *Server) file(w http.ResponseWriter, r *http.Request) {
@@ -139,7 +123,11 @@ func (s *Server) status(w http.ResponseWriter, r *http.Request) {
 	}
 	secs := []statusSection{}
 	cfg := s.o.Config.Get()
+	vis := s.visibleSections(r)
 	for _, sec := range cfg.SortedSections() {
+		if vis != nil && !vis[sec.ID] {
+			continue
+		}
 		secs = append(secs, statusSection{ID: sec.ID, Name: sec.Nome, Documents: counts[sec.ID], Scan: st[sec.ID]})
 	}
 	var recent []synclog.Entry

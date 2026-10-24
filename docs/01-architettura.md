@@ -63,6 +63,9 @@
 | HTTP :8080 dietro NPM | Il certificato e l'access list LAN restano nel proxy che esiste già. Il container non gestisce certificati. |
 | Aggiornamenti PWA solo di notte e in inattività | Il service worker nuovo resta in `waiting` e si attiva con `skipWaiting` solo nella finestra notturna dopo X minuti senza interazioni. Una lettura in corso non viene mai interrotta. |
 | Postazioni | Altri PC abbinati con un codice monouso di 10 minuti (dal totem in manutenzione o con `totem abbina-postazione`). Leggono i documenti ed entrano in manutenzione con il PIN, ma non sostituiscono il totem; il token di manutenzione resta legato al dispositivo che l'ha ottenuto. |
+| Più totem e reparti | Il manifest è una vista per dispositivo costruita a ogni richiesta: le share si leggono una volta sola, ogni totem scarica solo le sezioni del suo reparto. I reparti decidono cosa mostrare, non sono un confine di sicurezza. |
+| Numeri utili, avvisi, salvaschermo nel manifest | Arrivano con la sync e restano in IndexedDB: funzionano offline; le date degli avvisi le controlla il totem. |
+| Pagina di monitoraggio | Token dedicato (solo hash in config), HTTP 503 in caso di errore: si integra con qualsiasi strumento senza plugin. |
 | Fase 2 già nel modello | Un dispositivo ha `ruolo` (`totem`/`telefono`). Le API di abbinamento e revoca esistono, ma rispondono 404 finché `globali.fase2` è `false`. |
 
 ## Interfaccia e kiosk

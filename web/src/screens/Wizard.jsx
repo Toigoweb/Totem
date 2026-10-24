@@ -79,8 +79,9 @@ export function Wizard() {
       <div class="body">
         {step === 'code' && (
           <CodeStep steps={steps} onCancel={cancel} onOk={async (d) => {
-            if (d.role === 'postazione') {
-              await markPaired('postazione');
+            // codice di postazione o di un totem aggiuntivo: abbinato subito, resta la sync
+            if (d.paired) {
+              await markPaired(d.role);
               setInfo({ station: true });
               setStep('sync');
               return;

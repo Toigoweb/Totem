@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { pillState, recentDocs } from './app.js';
+import { pillState, recentDocs, activeNotices } from './app.js';
+import { screensaverMode } from './kiosk/Screensaver.jsx';
 import { inWindow, shouldApply } from './kiosk/updates.js';
 import { validPath, validUser } from './screens/SectionForm.jsx';
 import { buildIndex } from './screens/Search.jsx';
@@ -78,5 +79,26 @@ describe('ricerca locale', () => {
     expect(ix.search('solventi').map((r) => r.id)).toEqual(['s/a']);
     expect(ix.search('emergenza').map((r) => r.id)).toEqual(['e/c']);
     expect(ix.search('zzz')).toEqual([]);
+  });
+});
+
+describe('avvisi e salvaschermo', () => {
+  it('avvisi attivi oggi, date incluse', () => {
+    const ns = [{ id: 'a', from: '2026-10-24', to: '2026-10-24' }, { id: 'b', to: '2026-10-23' }, { id: 'c', from: '2026-10-25' }, { id: 'd' }];
+    expect(activeNotices(ns, new Date('2026-10-24T10:00:00')).map((n) => n.id)).toEqual(['a', 'd']);
+  });
+  it('salvaschermo: solo totem, dopo N minuti, nero di notte, mai in manutenzione', () => {
+    const t = new Date('2026-10-24T10:00:00');
+    const base = { role: 'totem', maint: null, route: { name: 'home' }, lastInteraction: t.getTime() - 6 * 60000,
+      extras: { screensaver: { enabled: true, afterMinutes: 5, night: true, nightHours: '20:00-06:00' } } };
+    expect(screensaverMode(base, t)).toBe('info');
+    expect(screensaverMode({ ...base, lastInteraction: t.getTime() - 60000 }, t)).toBe(null);
+    expect(screensaverMode({ ...base, role: 'postazione' }, t)).toBe(null);
+    expect(screensaverMode({ ...base, maint: { token: 'x' } }, t)).toBe(null);
+    expect(screensaverMode({ ...base, route: { name: 'wizard' } }, t)).toBe(null);
+    expect(screensaverMode(base, new Date('2026-10-24T22:00:00'))).toBe('nero');
+    const off = { ...base, extras: { screensaver: { ...base.extras.screensaver, enabled: false } } };
+    expect(screensaverMode(off, t)).toBe(null);
+    expect(screensaverMode(off, new Date('2026-10-24T22:00:00'))).toBe('nero');
   });
 });
