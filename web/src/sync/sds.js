@@ -48,8 +48,10 @@ function pick(perPage, skip) {
  * @returns {Promise<{pages: string[], numPages: number}>}
  */
 export async function extractPagesText(buf) {
-  const pdfjs = await import('../viewer/pdfjs.js').then((m) => m.loadPdfjs());
-  const doc = await pdfjs.getDocument({ data: new Uint8Array(buf.slice(0)), isEvalSupported: false }).promise;
+  const { loadPdfjs, PDF_OPTIONS } = await import('../viewer/pdfjs.js');
+  const pdfjs = await loadPdfjs();
+  const task = pdfjs.getDocument({ data: new Uint8Array(buf.slice(0)), ...PDF_OPTIONS });
+  const doc = await task.promise;
   const pages = [];
   try {
     for (let i = 1; i <= doc.numPages; i++) {
@@ -60,7 +62,7 @@ export async function extractPagesText(buf) {
     }
     return { pages, numPages: doc.numPages };
   } finally {
-    doc.destroy();
+    task.destroy();
   }
 }
 
@@ -69,7 +71,8 @@ export async function analyzePdf(buf, extract = extractPagesText) {
   try {
     const { pages, numPages } = await extract(buf);
     return { numPages, ...findSdsSections(pages) };
-  } catch {
+  } catch (e) {
+    console.warn('analisi SDS non riuscita', e);
     return { numPages: 0, recognized: false, sections: {} };
   }
 }

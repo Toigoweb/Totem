@@ -93,6 +93,7 @@ func New(o Options) *Server {
 func (s *Server) Handler() http.Handler {
 	m := http.NewServeMux()
 	m.HandleFunc("GET /api/health", s.health)
+	m.HandleFunc("GET /brand/logo", s.logo)
 
 	// primo avvio
 	m.HandleFunc("GET /api/setup/state", s.setupState)
@@ -134,8 +135,10 @@ func securityHeaders(h http.Handler) http.Handler {
 		hd.Set("X-Content-Type-Options", "nosniff")
 		hd.Set("Referrer-Policy", "no-referrer")
 		hd.Set("X-Frame-Options", "DENY")
-		hd.Set("Content-Security-Policy", "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; "+
-			"worker-src 'self' blob:; connect-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'")
+		// 'wasm-unsafe-eval' serve ai decoder wasm di pdf.js (JPEG 2000, JBIG2): niente eval JS
+		hd.Set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; img-src 'self' data: blob:; "+
+			"style-src 'self' 'unsafe-inline'; font-src 'self' data:; worker-src 'self' blob:; connect-src 'self'; "+
+			"object-src 'none'; frame-ancestors 'none'; base-uri 'self'")
 		if strings.HasPrefix(r.URL.Path, "/api/") {
 			hd.Set("Cache-Control", "no-store")
 		}

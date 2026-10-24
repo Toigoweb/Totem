@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite';
 import preact from '@preact/preset-vite';
 import { VitePWA } from 'vite-plugin-pwa';
-import { writeFileSync } from 'node:fs';
+import { cpSync, writeFileSync } from 'node:fs';
 
 const version = process.env.VITE_APP_VERSION || 'dev';
 
@@ -11,6 +11,15 @@ export default defineConfig({
     preact(),
     // web/dist/.keep è nel repository: senza, go:embed fallisce su un checkout pulito.
     { name: 'keep-dist', closeBundle() { writeFileSync('dist/.keep', ''); } },
+    // risorse di pdf.js self-hosted (font standard, cmaps, decoder wasm, profili ICC)
+    {
+      name: 'pdfjs-assets',
+      writeBundle() {
+        for (const d of ['cmaps', 'standard_fonts', 'wasm', 'iccs']) {
+          cpSync(`node_modules/pdfjs-dist/${d}`, `dist/pdfjs/${d}`, { recursive: true, filter: (f) => !/LICENSE|\.md$/.test(f) });
+        }
+      },
+    },
     // Workbox solo per la shell dell'app: i PDF li gestisce la sync scritta a mano.
     VitePWA({
       strategies: 'injectManifest',
@@ -18,8 +27,12 @@ export default defineConfig({
       filename: 'sw.js',
       injectRegister: false,
       manifest: false,
-      injectManifest: { globPatterns: ['**/*.{js,css,html,woff2,svg,png,webmanifest,mjs}'] },
+      injectManifest: {
+        globPatterns: ['**/*.{js,css,html,woff2,svg,png,webmanifest,mjs,bcmap,pfb,ttf,wasm,icc}'],
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+      },
     }),
   ],
   build: { target: 'es2020', assetsDir: 'assets', sourcemap: false },
+  test: { environment: 'node' },
 });

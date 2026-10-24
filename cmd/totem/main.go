@@ -19,6 +19,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"syscall"
 	"time"
 	_ "time/tzdata" // TZ=Europe/Rome anche su distroless
@@ -109,7 +110,9 @@ func serve() int {
 		logger.Error("log di sync", "err", err)
 		return 1
 	}
-	sc, err := scanner.New(scanner.Options{DataDir: dataDir, Config: store, Cipher: ci, Settings: settings, Log: syncLog, Logger: logger})
+	// TOTEM_SMB_PORT serve solo ai test (Samba su una porta diversa dalla 445)
+	smbPort, _ := strconv.Atoi(os.Getenv("TOTEM_SMB_PORT"))
+	sc, err := scanner.New(scanner.Options{DataDir: dataDir, Config: store, Cipher: ci, Settings: settings, Log: syncLog, Logger: logger, Port: smbPort})
 	if err != nil {
 		logger.Error("scanner", "err", err)
 		return 1
