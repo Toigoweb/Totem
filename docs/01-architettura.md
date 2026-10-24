@@ -64,6 +64,21 @@
 | Aggiornamenti PWA solo di notte e in inattività | Il service worker nuovo resta in `waiting` e si attiva con `skipWaiting` solo nella finestra notturna dopo X minuti senza interazioni. Una lettura in corso non viene mai interrotta. |
 | Fase 2 già nel modello | Un dispositivo ha `ruolo` (`totem`/`telefono`). Le API di abbinamento e revoca esistono, ma rispondono 404 finché `globali.fase2` è `false`. |
 
+## Interfaccia e kiosk
+
+- Navigazione a stati, senza URL: un kiosk non ha barra degli indirizzi.
+- I PDF si leggono solo dalla Cache Storage; pdf.js, worker, font standard, cmaps e decoder
+  wasm sono nella PWA e in precache, quindi la lettura non tocca mai la rete.
+- Il service worker prende il controllo alla prima installazione (offline subito); gli
+  aggiornamenti restano in attesa fino alla finestra notturna con la Home aperta e il
+  totem inattivo.
+- Inattività (default 3 min): ritorno alla Home, chiusura di ricerca, tastierini e
+  manutenzione. La procedura guidata non si interrompe.
+- Errore JavaScript non gestito: ricarica sulla Home (al massimo 3 volte in 5 minuti,
+  poi una ogni minuto, per non entrare in un ciclo).
+- Il logo aziendale si mette in `/data/logo.svg` o `/data/logo.png`; la PWA lo conserva in
+  IndexedDB per l'uso offline. Senza logo compare la scritta SICUREZZA.
+
 ## Nomi di file da tenere distinti
 
 - `/manifest.json`: il manifest **dei documenti**, protetto dal token di dispositivo, come

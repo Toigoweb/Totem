@@ -2,6 +2,7 @@
 //
 //	totem                 avvia il server (equivale a "totem serve")
 //	totem healthcheck     usato da HEALTHCHECK nel Dockerfile
+//	totem scan            chiede una scansione immediata delle share
 //	totem reset-pairing   invalida i token dei dispositivi e genera un nuovo codice di setup
 //	                      (--reset-pin azzera anche il PIN)
 package main
@@ -59,10 +60,12 @@ func main() {
 		os.Exit(healthcheck())
 	case "reset-pairing":
 		os.Exit(resetPairing(args))
+	case "scan":
+		os.Exit(scanNow())
 	case "version", "--version", "-v":
 		fmt.Println(version.Version)
 	default:
-		fmt.Fprintf(os.Stderr, "comando sconosciuto %q (serve | healthcheck | reset-pairing [--reset-pin] | version)\n", cmd)
+		fmt.Fprintf(os.Stderr, "comando sconosciuto %q (serve | healthcheck | scan | reset-pairing [--reset-pin] | version)\n", cmd)
 		os.Exit(2)
 	}
 }
@@ -193,6 +196,19 @@ func healthcheck() int {
 		fmt.Fprintln(os.Stderr, "non in salute: HTTP", resp.StatusCode)
 		return 1
 	}
+	return 0
+}
+
+// scanNow chiede al server in esecuzione una scansione immediata delle share.
+func scanNow() int {
+	c := &http.Client{Timeout: 5 * time.Second}
+	resp, err := c.Post(internalURL("/internal/scan"), "application/json", bytes.NewReader(nil))
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "scan: server non raggiungibile:", err)
+		return 1
+	}
+	resp.Body.Close()
+	fmt.Println("Scansione richiesta.")
 	return 0
 }
 

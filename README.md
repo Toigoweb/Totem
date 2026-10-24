@@ -3,10 +3,9 @@
 Totem offline-first per consultare in reparto le schede di sicurezza, le schede prodotto e i
 piani di emergenza che stanno sulle share SMB aziendali.
 
-> **Stato del lavoro.** Fatti: architettura, formati, wireframe, server (scansione SMB,
-> archivio, manifest, API, autenticazione), immagine Docker, CI e la logica di sync della
-> PWA. Mancano: interfaccia (in attesa dell'approvazione dei wireframe), test end-to-end
-> Playwright, README completo e checklist di messa in servizio.
+> **Stato del lavoro.** Fatti: architettura, formati, wireframe approvati, server (scansione
+> SMB, archivio, manifest, API, autenticazione), immagine Docker, CI, sync della PWA,
+> interfaccia e test end-to-end. Mancano: README completo e checklist di messa in servizio.
 
 ## Documenti
 
@@ -28,6 +27,9 @@ docker compose -f docker-compose.test.yml down
 
 # PWA (Node 22)
 cd web && npm ci && npm test && npm run build
+
+# end-to-end (Playwright, Chromium desktop e tablet Android emulato, Samba in Docker)
+cd test/e2e && npm ci && npx playwright test
 
 # immagine
 docker build --build-arg VERSION=0.0.0-dev -t totem:dev .
@@ -52,3 +54,5 @@ Comandi utili:
 | Come sopra, azzerando anche il PIN | `docker compose exec totem /totem reset-pairing --reset-pin` |
 | Con il container fermo | `docker compose run --rm totem reset-pairing` (il codice compare nei log al prossimo avvio) |
 | Stato del container | `docker compose ps` (colonna `healthy`) |
+| Scansione immediata delle share | `docker compose exec totem /totem scan` |
+| Logo aziendale nella barra | copiare `logo.svg` o `logo.png` (max 2 MB) in `./data/` |

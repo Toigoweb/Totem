@@ -15,8 +15,10 @@ export default defineConfig({
     {
       name: 'pdfjs-assets',
       writeBundle() {
+        // esclusi: fallback senza wasm (la CSP ammette il wasm) e QuickJS (niente script nei PDF)
+        // esclusi: fallback senza wasm (la CSP ammette il wasm) e QuickJS (niente script nei PDF)
         for (const d of ['cmaps', 'standard_fonts', 'wasm', 'iccs']) {
-          cpSync(`node_modules/pdfjs-dist/${d}`, `dist/pdfjs/${d}`, { recursive: true, filter: (f) => !/LICENSE|\.md$/.test(f) });
+          cpSync(`node_modules/pdfjs-dist/${d}`, `dist/pdfjs/${d}`, { recursive: true, filter: (f) => !/LICENSE|\.md$|nowasm_fallback|quickjs/.test(f) });
         }
       },
     },

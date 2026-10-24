@@ -12,6 +12,10 @@ func (s *Server) InternalHandler() http.Handler {
 		body, _ := s.o.Scanner.ManifestBody()
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "version": s.o.Version, "manifest": body != nil})
 	})
+	m.HandleFunc("POST /internal/scan", func(w http.ResponseWriter, r *http.Request) {
+		s.o.Scanner.Kick()
+		writeJSON(w, http.StatusAccepted, map[string]any{"ok": true})
+	})
 	m.HandleFunc("POST /internal/reset-pairing", func(w http.ResponseWriter, r *http.Request) {
 		code, err := s.ResetPairing(r.URL.Query().Get("reset-pin") == "1")
 		if err != nil {

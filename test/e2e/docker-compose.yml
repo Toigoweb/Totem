@@ -1,0 +1,9 @@
+# Samba per i test end-to-end (porta 1446). La cartella condivisa è .work/share.
+services:
+  samba:
+    image: dperson/samba:latest
+    ports: ["1446:445"]
+    volumes: ["./.work/share:/share"]
+    command: >
+      -r -u "totem;Giusta-123" -s "e2e;/share;yes;yes;no;totem"
+      -g "map to guest = never"
