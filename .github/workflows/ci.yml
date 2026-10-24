@@ -80,7 +80,7 @@ jobs:
       - name: Installazione per un utente di prova
         shell: powershell
         run: |
-          $pw = ConvertTo-SecureString 'Totem-Prova-2026!' -AsPlainText -Force
+          $pw = ConvertTo-SecureString 'Kx7#pQ2!wZ9m-Lr4' -AsPlainText -Force
           New-LocalUser -Name totem -Password $pw -PasswordNeverExpires | Out-Null
           powershell -NoProfile -ExecutionPolicy Bypass -File deploy/windows/installa-kiosk.ps1 -Url https://totem.example.invalid -Utente totem
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
