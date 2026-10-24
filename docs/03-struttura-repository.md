@@ -17,24 +17,26 @@
 │   ├── public/                  icone, app.webmanifest
 │   └── src/
 │       ├── strings.js           unico file di stringhe (italiano)
-│       ├── sync/                manifest, download, verifica SHA-256, commit IndexedDB, spazio
-│       ├── db/                  IndexedDB (indice, mappa sezioni SDS, stato)
-│       ├── search/              MiniSearch
-│       ├── viewer/              pdf.js (worker self-hosted)
+│       ├── app.js, store.js     stato dell'app, navigazione, derivati (pillola, recenti)
+│       ├── sync/                db.js (IndexedDB), sync.js (manifest, download, SHA-256, commit),
+│       │                        sds.js (sezioni SDS con pdf.js), manager.js (timer, online, heartbeat)
+│       ├── viewer/              pdf.js self-hosted e visualizzatore
+│       ├── components/          barra superiore, logo con pressione lunga, tastierino PIN, icone
+│       ├── screens/             Home, Ricerca, Sezione, Lettura, Stato, PIN, Manutenzione, Form, Procedura guidata
 │       ├── kiosk/               inattività, errori globali, aggiornamenti notturni
-│       ├── screens/             Home, Sezione, Lettura, Stato, PIN, Manutenzione, Form, Wizard
 │       └── sw.js                service worker (Workbox injectManifest, solo shell)
-├── wireframes/index.html        wireframe statici navigabili (da approvare)
+├── wireframes/index.html        wireframe statici navigabili (approvati)
+├── deploy/windows/              watchdog del kiosk Chrome e script di installazione (fase A)
 ├── test/
 │   ├── integration/             test Go con tag `integration` contro Samba
-│   ├── fixtures/                PDF di prova (validi, troncati, SDS con 16 sezioni)
-│   └── e2e/                     Playwright: desktop Chromium + mobile emulato
+│   ├── fixtures/genpdf.py       generatore di PDF di prova (SDS con 16 sezioni, generici, troncati)
+│   └── e2e/                     Playwright: Chromium desktop + tablet Android emulato, server Go e Samba
 ├── docs/                        architettura, formati, messa in servizio
 ├── Dockerfile                   node → go → distroless/static:nonroot
 ├── docker-compose.yml           l'unico compose di produzione
 ├── docker-compose.test.yml      Samba + totem per i test di integrazione
 ├── .github/workflows/
-│   ├── ci.yml                   push/PR: go vet, go test, npm test, build
+│   ├── ci.yml                   push/PR: go vet, go test, integrazione Samba, npm test, e2e, build immagine
 │   └── release.yml              tag vX.Y.Z → GHCR :X.Y.Z :X.Y :X
 └── README.md
 ```

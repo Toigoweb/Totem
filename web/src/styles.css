@@ -23,7 +23,8 @@ html, body, #app { height: 100%; margin: 0; }
 body {
   background: var(--bianco); color: var(--navy); font-family: var(--f-testo); font-size: 1rem; line-height: 1.35;
   overflow: hidden; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
-  overscroll-behavior: none; touch-action: manipulation;
+  overscroll-behavior: none;
+  touch-action: pan-x pan-y; /* niente zoom del browser né doppio tocco: lo zoom c'è solo nel visualizzatore */
 }
 input, textarea { -webkit-user-select: text; user-select: text; }
 #app { display: flex; flex-direction: column; }
