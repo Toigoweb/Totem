@@ -60,6 +60,51 @@ jobs:
         uses: actions/upload-artifact@v4
         with: { name: e2e-report, path: test/e2e/test-results, retention-days: 7 }
 
+  # Script del kiosk Windows (fase A) provati su un Windows vero
+  windows-kiosk:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Sintassi degli script PowerShell
+        shell: pwsh
+        run: |
+          $fail = $false
+          foreach ($f in Get-ChildItem deploy/windows/*.ps1) {
+            $errs = $null
+            [System.Management.Automation.Language.Parser]::ParseFile($f.FullName, [ref]$null, [ref]$errs) | Out-Null
+            if ($errs) { $errs | ForEach-Object { Write-Host "$($f.Name): $_" }; $fail = $true }
+          }
+          if ($fail) { exit 1 }
+
+      - name: Installazione per un utente di prova
+        shell: powershell
+        run: |
+          $pw = ConvertTo-SecureString 'Totem-Prova-2026!' -AsPlainText -Force
+          New-LocalUser -Name totem -Password $pw -PasswordNeverExpires | Out-Null
+          powershell -NoProfile -ExecutionPolicy Bypass -File deploy/windows/installa-kiosk.ps1 -Url https://totem.example.invalid -Utente totem
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $t = Get-ScheduledTask -TaskName 'Totem - kiosk', 'Totem - riavvio notturno browser'
+          $t | Format-Table TaskName, State, @{n='Utente';e={$_.Principal.UserId}}
+          if ($t.Count -ne 2) { throw 'attività pianificate mancanti' }
+          if (-not (Test-Path C:\TotemKiosk\totem-kiosk.ps1)) { throw 'watchdog non copiato' }
+
+      - name: Il watchdog avvia Chrome e lo riapre
+        shell: powershell
+        run: |
+          function Kiosk { @(Get-CimInstance Win32_Process -Filter "Name = 'chrome.exe'" | Where-Object { $_.CommandLine -like '*TotemKiosk*' }) }
+          $w = Start-Process powershell -PassThru -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-File','C:\TotemKiosk\totem-kiosk.ps1','-Url','about:blank','-IntervalSec','3'
+          Start-Sleep -Seconds 25
+          if ((Kiosk).Count -eq 0) { Get-Content C:\TotemKiosk\watchdog.log; throw 'Chrome non avviato' }
+          Write-Host 'Chrome avviato con il profilo del totem'
+          Stop-Process -Name chrome -Force
+          Start-Sleep -Seconds 20
+          if ((Kiosk).Count -eq 0) { Get-Content C:\TotemKiosk\watchdog.log; throw 'Chrome non riaperto' }
+          Write-Host 'Chrome riaperto dal watchdog'
+          Get-Content C:\TotemKiosk\watchdog.log
+          Stop-Process -Id $w.Id -Force
+          Stop-Process -Name chrome -Force -ErrorAction SilentlyContinue
+
   image:
     runs-on: ubuntu-latest
     steps:
