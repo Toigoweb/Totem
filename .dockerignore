@@ -1,0 +1,9 @@
+.git
+data
+secrets
+web/node_modules
+web/dist
+test
+docs
+wireframes
+*.md

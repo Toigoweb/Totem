@@ -1,0 +1,12 @@
+{
+  "name": "Totem documenti di sicurezza",
+  "short_name": "Totem",
+  "lang": "it",
+  "start_url": "/",
+  "scope": "/",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#FFFFFF",
+  "theme_color": "#12263F",
+  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}

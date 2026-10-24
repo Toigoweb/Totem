@@ -252,6 +252,14 @@ func (st *Store) Get() *Config {
 	return st.cfg.Clone()
 }
 
+// View chiama fn con la configurazione corrente in sola lettura, senza copiarla.
+// fn non deve modificare c né conservarne riferimenti.
+func (st *Store) View(fn func(c *Config)) {
+	st.mu.RLock()
+	defer st.mu.RUnlock()
+	fn(st.cfg)
+}
+
 // Update applica fn a una copia; se fn non restituisce errore la copia viene salvata
 // su disco e diventa la configurazione corrente. In caso di errore nulla cambia.
 func (st *Store) Update(fn func(c *Config) error) error {
