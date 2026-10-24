@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"sort"
 	"sync"
 	"time"
 
@@ -46,7 +47,8 @@ func (a stamp) eq(b stamp) bool { return a.Size == b.Size && a.MTime.Equal(b.MTi
 
 type rejected struct {
 	stamp
-	Code string `json:"code"`
+	Code string    `json:"code"`
+	At   time.Time `json:"at"` // primo scarto di questa versione del file
 }
 
 // SectionStatus è l'esito dell'ultima scansione di una sezione.
@@ -101,6 +103,7 @@ type Scanner struct {
 	body     []byte
 	etag     string
 	status   map[string]SectionStatus
+	problems []Problem
 	lastScan time.Time
 }
 
@@ -149,6 +152,7 @@ func New(o Options) (*Scanner, error) {
 	for id, st := range s.st.Status {
 		s.status[id] = *st
 	}
+	s.problems = s.buildProblems()
 	return s, nil
 }
 
@@ -263,14 +267,32 @@ func (s *Scanner) ScanOnce(ctx context.Context) (pending bool) {
 		}
 		s.o.Logger.Info("scansione", "nuovi", res.Added, "aggiornati", res.Updated, "rimossi", res.Removed, "errori", res.Errors)
 	}
+	probs := s.buildProblems()
 	s.mu.Lock()
 	s.status = map[string]SectionStatus{}
 	for id, st := range s.st.Status {
 		s.status[id] = *st
 	}
+	s.problems = probs
 	s.lastScan = now
 	s.mu.Unlock()
 	return pending
+}
+
+func (s *Scanner) buildProblems() []Problem {
+	out := []Problem{}
+	for id, r := range s.st.Rejected {
+		sec := sectionOf(id)
+		_, prev := s.st.Entries[id]
+		out = append(out, Problem{Section: sec, Path: id[len(sec)+1:], Code: r.Code, Size: r.Size, MTime: r.MTime, At: r.At, HasPrev: prev})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Section != out[j].Section {
+			return out[i].Section < out[j].Section
+		}
+		return out[i].Path < out[j].Path
+	})
+	return out
 }
 
 func sectionOf(docID string) string {
@@ -369,7 +391,7 @@ func (s *Scanner) scanSection(ctx context.Context, sec config.Section, now time.
 				nPending++
 				continue
 			case code == ErrCodeCorrupt || code == ErrCodeTooLarge:
-				s.st.Rejected[id] = rejected{cur, code}
+				s.st.Rejected[id] = rejected{cur, code, now}
 				res.Errors++
 				res.Details = append(res.Details, synclog.Detail{Section: sec.ID, Path: f.Path, Code: code, Msg: err.Error()})
 				s.o.Logger.Warn("PDF scartato, resta la versione precedente", "sezione", sec.ID, "file", f.Path, "codice", code, "err", err.Error())
@@ -530,6 +552,25 @@ func (s *Scanner) Current() *Manifest {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.current
+}
+
+// Problem è un PDF presente sulla share ma scartato (danneggiato, troppo grande).
+// Sul totem resta l'eventuale versione precedente valida.
+type Problem struct {
+	Section string    `json:"section"`
+	Path    string    `json:"path"`
+	Code    string    `json:"code"`
+	Size    int64     `json:"size"`
+	MTime   time.Time `json:"mtime"`
+	At      time.Time `json:"at"`
+	HasPrev bool      `json:"hasPrevious"`
+}
+
+// Problems restituisce i PDF scartati, ordinati per sezione e percorso.
+func (s *Scanner) Problems() []Problem {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return append([]Problem(nil), s.problems...)
 }
 
 // Status restituisce lo stato delle sezioni e l'ora dell'ultima scansione.

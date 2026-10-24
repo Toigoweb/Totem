@@ -93,6 +93,7 @@ svg.i { width: 1.2em; height: 1.2em; flex: none; fill: none; stroke: currentColo
 .badge.nuovo { background: var(--giallo); }
 .badge.agg { background: var(--grigio-bg); }
 .badge.emerg { border-color: var(--rosso); color: var(--rosso); }
+.badge.postazione { background: transparent; color: var(--giallo); border-color: var(--giallo); }
 
 .vuoto { flex: 1; display: grid; place-items: center; text-align: center; }
 .vuoto .c { display: grid; gap: 20px; justify-items: center; max-width: 680px; }

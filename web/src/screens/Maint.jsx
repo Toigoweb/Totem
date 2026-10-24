@@ -120,6 +120,8 @@ export function Maint() {
           </button>
           {rows.length >= max && <span class="piccolo">{S.maxSections(max)}</span>}
           <button class="btn" disabled={ro} onClick={() => go('changePin')}><Icon name="lucchetto" />{S.changePin}</button>
+          <button class="btn" disabled={ro} data-testid="open-devices" onClick={() => go('devices')}><Icon name="ingranaggio" />{S.devices}</button>
+          <button class="btn" disabled={ro} data-testid="open-problems" onClick={() => go('problems')}><Icon name="avviso" />{S.problems}</button>
         </div>
       </div>
       {confirm && (

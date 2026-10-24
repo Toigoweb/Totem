@@ -151,6 +151,12 @@ export class Totem {
     }
   }
 
+  /** Codice di postazione dal server (come "totem abbina-postazione"). */
+  async stationCode(nome = 'Postazione') {
+    const r = await fetch(`http://127.0.0.1:${this.internal}/internal/pair-station?nome=${encodeURIComponent(nome)}`, { method: 'POST' });
+    return (await r.json()).code;
+  }
+
   async resetPairing() {
     const r = await fetch(`http://127.0.0.1:${this.internal}/internal/reset-pairing`, { method: 'POST' });
     return (await r.json()).setupCode;

@@ -3,6 +3,8 @@
 //	totem                 avvia il server (equivale a "totem serve")
 //	totem healthcheck     usato da HEALTHCHECK nel Dockerfile
 //	totem scan            chiede una scansione immediata delle share
+//	totem abbina-postazione [--nome "PC ufficio IT"]
+//	                      stampa un codice monouso (10 minuti) per abbinare un altro PC
 //	totem reset-pairing   invalida i token dei dispositivi e genera un nuovo codice di setup
 //	                      (--reset-pin azzera anche il PIN)
 package main
@@ -17,6 +19,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -62,10 +65,12 @@ func main() {
 		os.Exit(resetPairing(args))
 	case "scan":
 		os.Exit(scanNow())
+	case "abbina-postazione":
+		os.Exit(pairStation(args))
 	case "version", "--version", "-v":
 		fmt.Println(version.Version)
 	default:
-		fmt.Fprintf(os.Stderr, "comando sconosciuto %q (serve | healthcheck | scan | reset-pairing [--reset-pin] | version)\n", cmd)
+		fmt.Fprintf(os.Stderr, "comando sconosciuto %q (serve | healthcheck | scan | abbina-postazione [--nome N] | reset-pairing [--reset-pin] | version)\n", cmd)
 		os.Exit(2)
 	}
 }
@@ -209,6 +214,31 @@ func scanNow() int {
 	}
 	resp.Body.Close()
 	fmt.Println("Scansione richiesta.")
+	return 0
+}
+
+// pairStation chiede al server in esecuzione un codice per abbinare una postazione.
+func pairStation(args []string) int {
+	fs := flag.NewFlagSet("abbina-postazione", flag.ContinueOnError)
+	nome := fs.String("nome", "Postazione", "nome della postazione (es. \"PC ufficio IT\")")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	c := &http.Client{Timeout: 5 * time.Second}
+	resp, err := c.Post(internalURL("/internal/pair-station?nome="+url.QueryEscape(*nome)), "application/json", bytes.NewReader(nil))
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "abbina-postazione: server non raggiungibile:", err)
+		return 1
+	}
+	defer resp.Body.Close()
+	var out struct {
+		Code string `json:"code"`
+	}
+	if resp.StatusCode != http.StatusOK || json.NewDecoder(resp.Body).Decode(&out) != nil {
+		fmt.Fprintln(os.Stderr, "abbina-postazione: risposta inattesa, HTTP", resp.StatusCode)
+		return 1
+	}
+	fmt.Printf("Codice per la postazione «%s»: %s\nValido 10 minuti, una sola volta. Sull'altro PC: aprire l'indirizzo del totem → Inizia configurazione → inserire il codice.\n", *nome, out.Code)
 	return 0
 }
 

@@ -83,7 +83,8 @@ func (s *Server) setupState(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) setupCodeCheck(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Code string `json:"code"`
+		Code     string `json:"code"`
+		Platform string `json:"platform"`
 	}
 	if !readJSON(w, r, &req) {
 		return
@@ -91,11 +92,21 @@ func (s *Server) setupCodeCheck(w http.ResponseWriter, r *http.Request) {
 	if lockedResponse(w, s.codeLimiter.Check(), s.o.Now()) {
 		return
 	}
+	// codice di una postazione: abbina questo browser come postazione, senza toccare il totem
+	if s.pairStation(w, req.Code, req.Platform) {
+		return
+	}
 	s.mu.Lock()
 	code := s.setupCode
 	s.mu.Unlock()
 	if code == "" {
-		jsonErr(w, http.StatusConflict, "already_paired")
+		// il totem è già abbinato: qui valgono solo i codici di postazione
+		rem := s.codeLimiter.Fail()
+		if rem == 0 {
+			lockedResponse(w, s.codeLimiter.Check(), s.o.Now())
+			return
+		}
+		jsonErr(w, http.StatusUnauthorized, "wrong_code", "remaining", rem, "totemPaired", true)
 		return
 	}
 	if !auth.CodesEqual(req.Code, code) {

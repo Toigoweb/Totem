@@ -216,12 +216,26 @@ func TestCorruptKeepsPrevious(t *testing.T) {
 	if len(recent) == 0 || recent[0].Errors != 1 || recent[0].Details[0].Code != ErrCodeCorrupt {
 		t.Fatalf("errore non registrato: %+v", recent)
 	}
+	pr := e.sc.Problems()
+	if len(pr) != 1 || pr[0].Path != "x.pdf" || pr[0].Code != ErrCodeCorrupt || !pr[0].HasPrev || pr[0].At.IsZero() {
+		t.Fatalf("problemi: %+v", pr)
+	}
 	// un file corrotto mai visto prima non entra
 	e.write(dir, "nuovo.pdf", []byte("non sono un pdf %%EOF"), t0)
 	e.scan()
 	e.scan()
 	if e.doc("s_a/nuovo.pdf") != nil {
 		t.Fatal("PDF senza intestazione accettato")
+	}
+	if pr := e.sc.Problems(); len(pr) != 2 || pr[0].Path != "nuovo.pdf" || pr[0].HasPrev {
+		t.Fatalf("problemi: %+v", pr)
+	}
+	// il file corretto sparisce dall'elenco
+	e.write(dir, "nuovo.pdf", pdf("ora va"), t0.Add(2*time.Hour))
+	e.scan()
+	e.scan()
+	if pr := e.sc.Problems(); len(pr) != 1 {
+		t.Fatalf("problemi dopo la correzione: %+v", pr)
 	}
 }
 

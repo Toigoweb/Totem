@@ -171,8 +171,8 @@ func TestSetupFlowAndDeviceAuth(t *testing.T) {
 		t.Fatal("token in chiaro in config.json")
 	}
 	// codice monouso
-	if r := h.do(h.client(), "POST", "/api/setup/code", map[string]any{"code": "X"}); r.code != 409 {
-		t.Fatal("codice riutilizzabile", r.code)
+	if r := h.do(h.client(), "POST", "/api/setup/code", map[string]any{"code": "X"}); r.code != 401 || r.body["totemPaired"] != true {
+		t.Fatal("codice riutilizzabile", r.code, string(r.raw))
 	}
 	r = h.do(c, "GET", "/api/setup/state", nil)
 	if r.body["paired"] != true || r.body["role"] != "totem" || r.body["pinSet"] != true {
@@ -500,5 +500,118 @@ func TestStaticFallback(t *testing.T) {
 	}
 	if !strings.Contains(r.hdr.Get("Content-Security-Policy"), "default-src 'self'") {
 		t.Fatal("CSP assente")
+	}
+}
+
+func TestStations(t *testing.T) {
+	h := newHarness(t)
+	totem, mt := h.pair("1234")
+	M := func(c *http.Client, tok, method, path string, body any) resp { return h.do(c, method, path, body, MaintHeader, tok) }
+
+	r := M(totem, mt, "POST", "/api/maint/stations/pair-code", map[string]any{"nome": "PC ufficio IT"})
+	if r.code != 200 || r.body["expiresInSec"].(float64) != 600 {
+		t.Fatal(string(r.raw))
+	}
+	code := r.body["code"].(string)
+
+	// sull'altro PC il codice di postazione va nella procedura guidata
+	pc := h.client()
+	r = h.do(pc, "POST", "/api/setup/code", map[string]any{"code": strings.ToLower(code), "platform": "windows"})
+	if r.code != 200 || r.body["role"] != "postazione" || r.body["name"] != "PC ufficio IT" {
+		t.Fatal(string(r.raw))
+	}
+	if r := h.do(h.client(), "POST", "/api/setup/code", map[string]any{"code": code}); r.code != 401 {
+		t.Fatal("codice di postazione riutilizzabile")
+	}
+	// il totem resta abbinato, la postazione legge e fa manutenzione con il PIN
+	if r := h.do(totem, "GET", "/api/status", nil); r.code != 200 {
+		t.Fatal("totem scollegato dalla postazione")
+	}
+	r = h.do(pc, "GET", "/api/setup/state", nil)
+	if r.body["role"] != "postazione" || r.body["paired"] != true {
+		t.Fatal(string(r.raw))
+	}
+	r = h.do(pc, "POST", "/api/maint/login", map[string]any{"pin": "1234"})
+	if r.code != 200 {
+		t.Fatal(string(r.raw))
+	}
+	pt := r.body["token"].(string)
+	if r := M(pc, pt, "GET", "/api/maint/sections", nil); r.code != 200 {
+		t.Fatal(r.code)
+	}
+	// il token di manutenzione è legato al dispositivo
+	if r := M(totem, pt, "GET", "/api/maint/sections", nil); r.code != 401 {
+		t.Fatal("token della postazione accettato dal totem")
+	}
+
+	// elenco dei dispositivi con dati dell'ultimo contatto
+	h.clk.Add(2 * time.Minute)
+	h.do(totem, "POST", "/api/heartbeat", map[string]any{"appVersion": "1.0.0", "platform": "windows", "documents": 7, "freeBytes": 5000})
+	r = M(pc, pt, "GET", "/api/maint/devices", nil)
+	devs := r.body["devices"].([]any)
+	if len(devs) != 2 {
+		t.Fatal(string(r.raw))
+	}
+	tot, sta := devs[0].(map[string]any), devs[1].(map[string]any)
+	if tot["ruolo"] != "totem" || tot["documents"].(float64) != 7 || tot["appVersion"] != "1.0.0" || tot["corrente"] != false {
+		t.Fatal(tot)
+	}
+	if sta["ruolo"] != "postazione" || sta["corrente"] != true {
+		t.Fatal(sta)
+	}
+	// non si revoca il totem né sé stessi
+	if r := M(pc, pt, "DELETE", "/api/maint/devices/"+tot["id"].(string), nil); r.code != 404 {
+		t.Fatal("totem revocato", r.code)
+	}
+	if r := M(pc, pt, "DELETE", "/api/maint/devices/"+sta["id"].(string), nil); r.code != 409 {
+		t.Fatal("auto-revoca", r.code)
+	}
+	if r := M(totem, mt, "DELETE", "/api/maint/devices/"+sta["id"].(string), nil); r.code != 200 {
+		t.Fatal(r.code)
+	}
+	if r := h.do(pc, "GET", "/api/status", nil); r.code != 401 {
+		t.Fatal("postazione revocata ancora valida")
+	}
+
+	// codice scaduto dopo 10 minuti; codice dal listener interno
+	r = M(totem, mt, "POST", "/api/maint/stations/pair-code", map[string]any{})
+	h.clk.Add(10*time.Minute + time.Second)
+	if r := h.do(h.client(), "POST", "/api/setup/code", map[string]any{"code": r.body["code"]}); r.code != 401 {
+		t.Fatal("codice scaduto accettato")
+	}
+	h.srv.codeLimiter.Success()
+	in := httptest.NewServer(h.srv.InternalHandler())
+	defer in.Close()
+	rr, _ := http.Post(in.URL+"/internal/pair-station?nome=Prove", "application/json", nil)
+	var out struct{ Code string }
+	json.NewDecoder(rr.Body).Decode(&out)
+	r = h.do(h.client(), "POST", "/api/setup/code", map[string]any{"code": out.Code})
+	if r.code != 200 || r.body["name"] != "Prove" {
+		t.Fatal(string(r.raw))
+	}
+}
+
+func TestProblems(t *testing.T) {
+	h := newHarness(t)
+	c, mt := h.pair("1234")
+	os.WriteFile(filepath.Join(h.share, "rotto.pdf"), []byte("%PDF-1.4 senza fine"), 0o644)
+	enc, _ := h.ci.Encrypt("s_a", "giusta")
+	h.cfg.Update(func(cfg *config.Config) error {
+		cfg.Sezioni = []config.Section{{ID: "s_a", Nome: "Schede", Icona: "flacone", Share: config.Share{Percorso: `\\srv\sds`, Password: enc}}}
+		return nil
+	})
+	h.sc.ScanOnce(context.Background())
+	h.sc.ScanOnce(context.Background())
+	r := h.do(c, "GET", "/api/maint/problems", nil, MaintHeader, mt)
+	ps := r.body["problems"].([]any)
+	if len(ps) != 1 {
+		t.Fatal(string(r.raw))
+	}
+	p := ps[0].(map[string]any)
+	if p["path"] != "rotto.pdf" || p["code"] != "corrupt" || p["sectionName"] != "Schede" || p["hasPrevious"] != false {
+		t.Fatal(p)
+	}
+	if r := h.do(c, "GET", "/api/maint/problems", nil); r.code != 401 {
+		t.Fatal("problemi senza PIN")
 	}
 }

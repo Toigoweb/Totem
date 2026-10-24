@@ -32,7 +32,8 @@ export function Wizard() {
   const [step, setStep] = useState('code');
   const [info, setInfo] = useState(null); // { setupToken, pinSet, sections }
   const [firstPin, setFirstPin] = useState(null);
-  const steps = ['code', 'pin', ...(info && info.sections > 0 ? [] : ['section']), 'sync'];
+  // postazione: solo codice e prima sincronizzazione; totem: codice, PIN, (sezione), sync
+  const steps = info && info.station ? ['code', 'sync'] : ['code', 'pin', ...(info && info.sections > 0 ? [] : ['section']), 'sync'];
   const cancel = () => {
     exitMaintenance();
     go('home');
@@ -76,7 +77,19 @@ export function Wizard() {
     <div class="screen" data-testid="wizard">
       <TopBar left="logo-static" title={S.wizardTitle} right={null} />
       <div class="body">
-        {step === 'code' && <CodeStep steps={steps} onCancel={cancel} onOk={(d) => { setInfo(d); setFirstPin(null); setStep('pin'); }} />}
+        {step === 'code' && (
+          <CodeStep steps={steps} onCancel={cancel} onOk={async (d) => {
+            if (d.role === 'postazione') {
+              await markPaired('postazione');
+              setInfo({ station: true });
+              setStep('sync');
+              return;
+            }
+            setInfo(d);
+            setFirstPin(null);
+            setStep('pin');
+          }} />
+        )}
         {step === 'section' && (
           <>
             <Steps steps={steps} current="section" />
@@ -110,11 +123,11 @@ function CodeStep({ steps, onOk, onCancel }) {
     setBusy(true);
     setMsg(null);
     try {
-      const r = await api('/api/setup/code', { method: 'POST', body: { code } });
+      const r = await api('/api/setup/code', { method: 'POST', body: { code, platform: PLATFORM } });
       if (r.ok) return onOk(r.data);
       if (r.status === 429) setLockedUntil(Date.now() + (r.data.retryAfterSec || 300) * 1000);
       else if (r.status === 409) setMsg(S.codeUsed);
-      else if (r.status === 401) setMsg(S.codeWrong(r.data.remaining));
+      else if (r.status === 401) setMsg(r.data.totemPaired ? S.codeWrongPaired(r.data.remaining) : S.codeWrong(r.data.remaining));
       else setMsg(S.genericErr);
     } catch (err) {
       setMsg(err instanceof NetworkError ? S.networkErr : S.genericErr);

@@ -16,6 +16,10 @@ func (s *Server) InternalHandler() http.Handler {
 		s.o.Scanner.Kick()
 		writeJSON(w, http.StatusAccepted, map[string]any{"ok": true})
 	})
+	m.HandleFunc("POST /internal/pair-station", func(w http.ResponseWriter, r *http.Request) {
+		code := s.StationCode(r.URL.Query().Get("nome"))
+		writeJSON(w, http.StatusOK, map[string]any{"code": code, "expiresInSec": int(stationCodeTTL.Seconds())})
+	})
 	m.HandleFunc("POST /internal/reset-pairing", func(w http.ResponseWriter, r *http.Request) {
 		code, err := s.ResetPairing(r.URL.Query().Get("reset-pin") == "1")
 		if err != nil {

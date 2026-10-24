@@ -137,7 +137,7 @@ test('token revocato e sostituzione del totem', async ({ page, browser, totem })
   await ctx.close();
 });
 
-test('inattività: dalla lettura si torna alla Home e la manutenzione si chiude', async ({ page, totem }) => {
+test('inattività: dalla lettura si torna alla Home dopo 3 minuti, la manutenzione si chiude dopo 10', async ({ page, totem }) => {
   await page.clock.install();
   await ready(page, totem);
   await openDoc(page, 'Schede di sicurezza', 'Acetone');
@@ -147,7 +147,10 @@ test('inattività: dalla lettura si torna alla Home e la manutenzione si chiude'
   await page.getByTestId('maint-open').click();
   await typePin(page, PIN);
   await expect(page.getByTestId('maint')).toBeVisible();
+  // in manutenzione vale il timeout della fascia gialla: 10 minuti
   await page.clock.fastForward('03:10');
+  await expect(page.getByTestId('maint')).toBeVisible();
+  await page.clock.fastForward('07:10');
   await expect(page.getByTestId('home')).toBeVisible();
   await expect(page.getByTestId('maint')).toHaveCount(0);
 });

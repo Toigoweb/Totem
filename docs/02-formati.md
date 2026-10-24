@@ -134,6 +134,7 @@ Le chiavi sono in italiano perché è l'unico file pensato per essere letto da u
 | `share.percorso` | `\\server\condivisione[\cartella…]`. Nessun `..`, nessun carattere di controllo. |
 | `share.utente` | `DOMINIO\utente`, `utente@dominio` oppure `utente`. |
 | `share.password` | `v1:` + base64(nonce 12 byte ‖ ciphertext AES-256-GCM). Associated data = id della sezione. |
+| `globali.dispositivi[].ruolo` | `totem` (uno solo), `postazione` (altri PC con accesso alla manutenzione) o `telefono` (fase 2). |
 | `globali.dispositivi[].tokenHash` | SHA-256 esadecimale del token del cookie `totem_device`. |
 | `globali.dispositivi[].ultimoContatto` | Aggiornato dall'heartbeat, al massimo una volta al minuto. |
 | `impostazioni` | Facoltativo. Solo le chiavi elencate in `docs/01-architettura.md`; le chiavi sconosciute si ignorano con un avviso nel log. |

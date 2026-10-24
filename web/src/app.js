@@ -29,6 +29,7 @@ export const app = createStore({
   meta: { lastSuccess: null, lastError: null, syncLog: [] },
   sync: { running: false, progress: null, lastError: null, online: true, nextAt: null },
   paired: null, // null = sconosciuto
+  role: 'totem', // 'totem' | 'postazione'
   deviceError: false,
   maint: null, // { token }
   toast: null,
@@ -151,7 +152,8 @@ export async function init() {
   await reloadData();
   const hasDocs = app.get().docs.length > 0 || app.get().sections.length > 0;
   const pairedMeta = await db.getMeta('paired');
-  app.set({ ready: true, paired: hasDocs || !!pairedMeta ? true : null });
+  const roleMeta = await db.getMeta('role');
+  app.set({ ready: true, paired: hasDocs || !!pairedMeta ? true : null, role: roleMeta || 'totem' });
   requestPersistence().then((persist) => app.set({ persist }));
 
   // il server dice se questo dispositivo è abbinato; offline si usa ciò che c'è in locale
@@ -161,7 +163,8 @@ export async function init() {
       app.set({ serverVersion: r.data.serverVersion || null });
       if (r.data.paired) {
         await db.setMeta('paired', true);
-        app.set({ paired: true, deviceError: false });
+        await db.setMeta('role', r.data.role || 'totem');
+        app.set({ paired: true, deviceError: false, role: r.data.role || 'totem' });
       } else if (app.get().paired) {
         app.set({ deviceError: true }); // token revocato: i documenti restano consultabili
       } else {
@@ -174,9 +177,10 @@ export async function init() {
   if (app.get().paired) startSync();
 }
 
-export async function markPaired() {
+export async function markPaired(role = 'totem') {
   await db.setMeta('paired', true);
-  app.set({ paired: true, deviceError: false });
+  await db.setMeta('role', role);
+  app.set({ paired: true, deviceError: false, role });
 }
 
 // ---------------------------------------------------------------------------

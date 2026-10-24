@@ -189,6 +189,62 @@ Codici di errore delle sezioni, nei log e nella schermata Stato:
 
 ---
 
+## Altri PC, documenti scartati, istanza di prova
+
+### Accesso da altri PC (postazioni)
+
+Oltre al totem si possono abbinare altri PC, per esempio in ufficio IT o per le prove.
+Una **postazione** legge i documenti (anche offline) e può entrare in manutenzione con il
+PIN. Non sostituisce il totem: in alto a sinistra compare l'etichetta POSTAZIONE.
+
+1. Generare un codice monouso, valido 10 minuti, in uno di due modi:
+   - dal totem o da un'altra postazione: Area manutenzione → **Dispositivi** →
+     **Abbina un'altra postazione**, scrivere il nome e premere **Genera codice**;
+   - dal server: `docker compose exec totem /totem abbina-postazione --nome "PC ufficio IT"`.
+2. Sull'altro PC aprire `https://totem.azienda.it` (il PC deve essere in una subnet
+   dell'access list "LAN"), premere **Inizia configurazione** e inserire il codice.
+3. Dopo la prima sincronizzazione la postazione è pronta.
+
+In Area manutenzione → **Dispositivi** si vedono tutti i dispositivi con ultimo contatto,
+versione dell'app, documenti e spazio libero; da lì si **revocano** le postazioni.
+`reset-pairing` invalida tutti i dispositivi, postazioni comprese.
+
+### Documenti scartati
+
+Area manutenzione → **Documenti scartati** elenca i PDF che il server ha rifiutato
+(danneggiati, incompleti, oltre la dimensione massima), con sezione, percorso e data.
+Dice anche se sul totem resta la versione precedente. Basta sostituire il file nella
+cartella: al controllo successivo sparisce dall'elenco.
+
+### Istanza di prova
+
+Per provare nuove versioni, nuove sezioni o PDF particolari senza toccare il totem di
+reparto conviene un secondo container, completamente separato:
+
+```sh
+sudo mkdir -p /opt/totem-test && cd /opt/totem-test
+sudo mkdir data secrets && sudo chown -R 65532:65532 data secrets
+cat > docker-compose.yml <<'YAML'
+services:
+  totem:
+    image: ghcr.io/toigoweb/totem:1      # o la versione da provare, per esempio :1.1.0
+    restart: unless-stopped
+    read_only: true
+    ports: ["8081:8080"]
+    volumes: ["./data:/data", "./secrets:/secrets"]
+    environment: ["TZ=Europe/Rome"]
+    logging: { options: { max-size: "10m", max-file: "3" } }
+YAML
+docker compose up -d && docker compose logs totem   # codice di setup dell'istanza di prova
+```
+
+In NPM aggiungere un secondo proxy host `totem-test.azienda.it` verso la porta `8081`,
+con lo stesso certificato (o uno nuovo) e la stessa access list. L'istanza di prova ha
+PIN, sezioni e dispositivi suoi: si abbina un PC di prova con la procedura guidata e si
+usano cartelle di prova sulle share.
+
+---
+
 ## 4. Aggiornamento e rollback
 
 Le immagini si pubblicano su `ghcr.io/toigoweb/totem` con i tag `X.Y.Z`, `X.Y` e `X`. Il
@@ -200,6 +256,7 @@ compose usa `:1`, cioè l'ultima versione 1.x.
 | Bloccare una versione | Nel compose sostituire `:1` con `:1.2.3` |
 | Rollback | Rimettere il tag precedente (per esempio `:1.2.2`) nel compose e lanciare `docker compose up -d` |
 | Pubblicare una versione (sviluppo) | `git tag v1.2.3 && git push origin v1.2.3`: la GitHub Action compila e pubblica |
+| Provare prima una versione nuova | Nell'istanza di prova (vedi «Istanza di prova») impostare il tag nuovo, poi aggiornare il totem |
 | Notifica delle nuove versioni | Facoltativa: Watchtower in modalità solo notifica (`WATCHTOWER_MONITOR_ONLY=true`), che deve poter leggere `~/.docker/config.json` per GHCR |
 
 **Cosa succede sul totem:**

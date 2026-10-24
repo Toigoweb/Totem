@@ -105,6 +105,7 @@ export function StatusPill() {
  */
 export function TopBar({ title, left = 'logo', onBack, right, badge }) {
   const paired = useStore(app, (s) => s.paired);
+  const role = useStore(app, (s) => s.role);
   return (
     <header class="topbar">
       <div class="sx">
@@ -113,6 +114,7 @@ export function TopBar({ title, left = 'logo', onBack, right, badge }) {
         ) : (
           <Logo onLongPress={left === 'logo' && paired ? () => go('pin', { mode: 'login' }) : null} />
         )}
+        {role === 'postazione' && paired && <span class="badge postazione" data-testid="station-badge">{S.stationBadge}</span>}
       </div>
       <h1><span class="t">{title}</span>{badge}</h1>
       <div class="dx">{right === undefined ? (paired ? <StatusPill /> : null) : right}</div>

@@ -25,6 +25,7 @@ const (
 	CookieName  = "totem_device"
 	MaintHeader = "X-Maint-Token"
 	RoleTotem   = "totem"
+	RoleStation = "postazione"
 	RolePhone   = "telefono"
 )
 
@@ -35,6 +36,7 @@ type Scanner interface {
 	Status() (map[string]scanner.SectionStatus, time.Time)
 	BlobPath(sha string) (string, bool)
 	TestConnection(ctx context.Context, t smbsrc.Target) (int, error)
+	Problems() []scanner.Problem
 	Kick()
 }
 
@@ -62,7 +64,7 @@ type Server struct {
 	mu        sync.Mutex
 	setupCode string               // vuoto se il totem è già abbinato
 	tests     map[string]testGrant // prove di connessione riuscite
-	pairCodes map[string]time.Time // fase 2: codici di abbinamento
+	pairCodes map[string]pairGrant // codici di abbinamento di postazioni e telefoni
 	lastKick  time.Time
 	lastSeen  map[string]time.Time // ultimo salvataggio di ultimoContatto per dispositivo
 }
@@ -81,7 +83,7 @@ func New(o Options) *Server {
 		maint:       auth.NewSessions(o.Settings.MaintenanceIdle, 0),
 		setup:       auth.NewSessions(15*time.Minute, 30*time.Minute),
 		tests:       map[string]testGrant{},
-		pairCodes:   map[string]time.Time{},
+		pairCodes:   map[string]pairGrant{},
 		lastSeen:    map[string]time.Time{},
 	}
 	s.pinLimiter.Now, s.codeLimiter.Now = o.Now, o.Now
@@ -106,7 +108,7 @@ func (s *Server) Handler() http.Handler {
 	m.Handle("POST /api/heartbeat", s.device(http.HandlerFunc(s.heartbeat)))
 	m.Handle("GET /api/status", s.device(http.HandlerFunc(s.status)))
 	m.Handle("POST /api/scan", s.device(http.HandlerFunc(s.scanNow)))
-	m.Handle("POST /api/maint/login", s.totemOnly(http.HandlerFunc(s.maintLogin)))
+	m.Handle("POST /api/maint/login", s.staffOnly(http.HandlerFunc(s.maintLogin)))
 
 	// manutenzione (PIN)
 	m.Handle("POST /api/maint/logout", s.maintOnly(http.HandlerFunc(s.maintLogout)))
@@ -118,10 +120,14 @@ func (s *Server) Handler() http.Handler {
 	m.Handle("POST /api/maint/test", s.maintOnly(http.HandlerFunc(s.testConnection)))
 	m.Handle("POST /api/maint/pin", s.maintOnly(http.HandlerFunc(s.changePin)))
 
+	// dispositivi: postazioni, elenco e revoca, documenti scartati
+	m.Handle("POST /api/maint/stations/pair-code", s.maintOnly(http.HandlerFunc(s.stationCode)))
+	m.Handle("GET /api/maint/devices", s.maintOnly(http.HandlerFunc(s.listDevices)))
+	m.Handle("DELETE /api/maint/devices/{id}", s.maintOnly(http.HandlerFunc(s.revokeDevice)))
+	m.Handle("GET /api/maint/problems", s.maintOnly(http.HandlerFunc(s.problems)))
+
 	// fase 2: telefoni (404 finché globali.fase2 è false)
 	m.Handle("POST /api/maint/devices/pair-code", s.phase2(s.maintOnly(http.HandlerFunc(s.pairCode))))
-	m.Handle("GET /api/maint/devices", s.phase2(s.maintOnly(http.HandlerFunc(s.listDevices))))
-	m.Handle("DELETE /api/maint/devices/{id}", s.phase2(s.maintOnly(http.HandlerFunc(s.revokeDevice))))
 	m.Handle("POST /api/pair", s.phase2(http.HandlerFunc(s.pair)))
 
 	m.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) { jsonErr(w, http.StatusNotFound, "not_found") })
@@ -193,10 +199,10 @@ func (s *Server) device(h http.Handler) http.Handler {
 	})
 }
 
-// totemOnly: dispositivo con ruolo "totem" (i telefoni non fanno manutenzione).
-func (s *Server) totemOnly(h http.Handler) http.Handler {
+// staffOnly: totem o postazione (i telefoni non fanno manutenzione).
+func (s *Server) staffOnly(h http.Handler) http.Handler {
 	return s.device(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if deviceFrom(r).Ruolo != RoleTotem {
+		if role := deviceFrom(r).Ruolo; role != RoleTotem && role != RoleStation {
 			jsonErr(w, http.StatusForbidden, "forbidden")
 			return
 		}
@@ -204,9 +210,10 @@ func (s *Server) totemOnly(h http.Handler) http.Handler {
 	}))
 }
 
-// maintOnly: totem più token di manutenzione valido (scade dopo 10 minuti di inattività).
+// maintOnly: totem o postazione, più token di manutenzione valido (scade dopo 10 minuti
+// di inattività).
 func (s *Server) maintOnly(h http.Handler) http.Handler {
-	return s.totemOnly(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return s.staffOnly(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		v, err := s.maint.Use(r.Header.Get(MaintHeader))
 		if err != nil || v != deviceFrom(r).ID {
 			jsonErr(w, http.StatusUnauthorized, "maintenance")

@@ -62,6 +62,7 @@
 | config.json, nessun database | Le sezioni sono una manciata. Un file JSON con backup automatico prima delle migrazioni si legge, si salva e si ripristina senza strumenti. |
 | HTTP :8080 dietro NPM | Il certificato e l'access list LAN restano nel proxy che esiste già. Il container non gestisce certificati. |
 | Aggiornamenti PWA solo di notte e in inattività | Il service worker nuovo resta in `waiting` e si attiva con `skipWaiting` solo nella finestra notturna dopo X minuti senza interazioni. Una lettura in corso non viene mai interrotta. |
+| Postazioni | Altri PC abbinati con un codice monouso di 10 minuti (dal totem in manutenzione o con `totem abbina-postazione`). Leggono i documenti ed entrano in manutenzione con il PIN, ma non sostituiscono il totem; il token di manutenzione resta legato al dispositivo che l'ha ottenuto. |
 | Fase 2 già nel modello | Un dispositivo ha `ruolo` (`totem`/`telefono`). Le API di abbinamento e revoca esistono, ma rispondono 404 finché `globali.fase2` è `false`. |
 
 ## Interfaccia e kiosk
@@ -86,6 +87,7 @@
 | Dimensione dell'immagine | 24,6 MB (6,4 MB compressi) invece di circa 20 | La differenza sono le risorse di pdf.js. Si tengono le cmaps (1,7 MB): senza, una SDS di un fornitore con caratteri cinesi, giapponesi o coreani non si leggerebbe bene, e sul totem di sicurezza ogni documento deve aprirsi. Tolti invece i fallback non-wasm, QuickJS e i font woff/non latini. |
 | Totem non più abbinato | Pillola gialla "Abbinamento da rifare", documenti sempre leggibili | La specifica prevede quattro stati della pillola; questo quinto caso (dopo `reset-pairing` o cookie cancellato) deve restare distinguibile da "offline", perché si risolve solo con la procedura guidata. |
 | Inattività durante la procedura guidata | Non riporta alla Home | Un tecnico non deve perdere la messa in servizio a metà. |
+| Inattività in manutenzione | 10 minuti (fuori dalla manutenzione 3) | Coerente con la fascia gialla "uscita automatica dopo 10 minuti" e con la scadenza del token sul server. |
 | Blocco del PIN | Globale, non per indirizzo IP | In LAN gli indirizzi si cambiano facilmente. |
 
 ## Nomi di file da tenere distinti
