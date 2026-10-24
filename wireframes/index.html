@@ -1,0 +1,1171 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Wireframe Totem Sicurezza</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700&display=swap">
+<style>
+/* Layout: navigatore delle schermate a sinistra, cornice del totem scalata a destra.
+   Tema chiaro fisso, come da specifica: niente varianti scure. */
+:root {
+  color-scheme: light;
+  --navy: #12263F;
+  --navy-2: #1d3a5c;
+  --giallo: #FFC400;
+  --rosso: #B3261E;
+  --bianco: #FFFFFF;
+  --grigio: #5b6878;      /* testo secondario su bianco: 5.6:1 */
+  --grigio-chiaro: #e6eaf0;
+  --grigio-bg: #f3f5f8;
+  --verde: #1b6b3a;       /* solo affiancato a icona e testo */
+  --sfondo-pagina: #dfe4ea;
+  --f-testo: "Barlow", "Segoe UI", Roboto, Arial, sans-serif;
+  --f-titoli: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0; background: var(--sfondo-pagina); color: var(--navy);
+  font-family: var(--f-testo); font-size: 16px;
+}
+.app {
+  display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 20px; min-height: 100%;
+  padding-block: 20px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+@media (max-width: 900px) { .app { grid-template-columns: minmax(0, 1fr); } }
+
+/* ---------- Navigatore ---------- */
+.nav { background: var(--bianco); border-radius: 10px; padding: 18px; align-self: start; position: sticky; top: max(20px, env(safe-area-inset-top, 0px)); max-height: calc(100vh - 40px); overflow: auto; }
+@media (max-width: 900px) { .nav { position: static; max-height: none; } }
+.nav h1 { font-family: var(--f-titoli); font-size: 26px; margin: 0 0 4px; letter-spacing: .02em; text-wrap: balance; }
+.nav p { margin: 0 0 14px; color: var(--grigio); font-size: 14px; line-height: 1.4; }
+.nav h2 { font-family: var(--f-titoli); font-size: 15px; text-transform: uppercase; letter-spacing: .08em; color: var(--grigio); margin: 16px 0 6px; }
+.nav ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.nav button { all: unset; display: block; width: 100%; box-sizing: border-box; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 15px; }
+.nav button:hover { background: var(--grigio-bg); }
+.nav button[aria-current="true"] { background: var(--navy); color: var(--bianco); }
+.nav button:focus-visible { outline: 3px solid var(--giallo); outline-offset: 1px; }
+.ris { display: flex; flex-wrap: wrap; gap: 6px; }
+.ris button { width: auto; border: 1px solid var(--grigio-chiaro); }
+.note { margin-top: 12px; font-size: 13px; color: var(--grigio); line-height: 1.45; }
+
+/* ---------- Cornice del dispositivo ---------- */
+.stage { min-width: 0; }
+.stage-info { font-size: 14px; color: var(--grigio); margin: 0 0 10px; display: flex; gap: 12px; flex-wrap: wrap; }
+.scaler { position: relative; overflow: hidden; }
+.device {
+  position: absolute; top: 0; left: 0; transform-origin: 0 0;
+  background: var(--bianco); color: var(--navy); font-size: 20px; line-height: 1.35;
+  box-shadow: 0 0 0 10px #0b1626, 0 18px 40px rgba(18, 38, 63, .35); border-radius: 4px;
+  overflow: hidden; display: flex; flex-direction: column;
+}
+.device[data-scala="125"] { font-size: 25px; }
+.device[data-scala="150"] { font-size: 30px; }
+.screen { display: none; flex: 1; min-height: 0; flex-direction: column; position: relative; }
+.screen.on { display: flex; }
+
+/* ---------- Componenti del totem ---------- */
+svg.i { width: 1.2em; height: 1.2em; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.btn {
+  font: inherit; font-weight: 600; min-height: 56px; min-width: 56px; padding: 0 22px; border-radius: 8px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 10px; cursor: pointer;
+  border: 2px solid var(--navy); background: var(--bianco); color: var(--navy);
+}
+.btn.primario { background: var(--navy); color: var(--bianco); }
+.btn.giallo { background: var(--giallo); border-color: var(--navy); color: var(--navy); }
+.btn.rosso { background: var(--rosso); border-color: var(--rosso); color: var(--bianco); }
+.btn[disabled] { opacity: .45; cursor: not-allowed; }
+.btn:focus-visible, .tile:focus-visible, .riga:focus-visible { outline: 4px solid var(--giallo); outline-offset: 2px; }
+
+.topbar { min-height: 72px; background: var(--navy); color: var(--bianco); display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; padding: 0 16px; flex: none; }
+.topbar .sx { display: flex; align-items: center; gap: 12px; }
+.topbar .dx { display: flex; justify-content: flex-end; }
+.topbar h2 { margin: 0; font-family: var(--f-titoli); font-weight: 600; font-size: 1.5em; letter-spacing: .02em; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.logo { height: 48px; padding: 0 12px; display: flex; align-items: center; gap: 8px; border: 2px dashed rgba(255,255,255,.35); border-radius: 6px; font-family: var(--f-titoli); font-size: 18px; letter-spacing: .1em; color: rgba(255,255,255,.85); user-select: none; touch-action: none; cursor: default; }
+.logo.premuto { background: rgba(255,255,255,.12); }
+.indietro { background: transparent; color: var(--bianco); border-color: rgba(255,255,255,.6); font-size: 1em; }
+.pill { font: inherit; font-size: .9em; font-weight: 600; min-height: 56px; display: inline-flex; align-items: center; gap: 10px; padding: 0 18px; border-radius: 999px; border: 2px solid rgba(255,255,255,.55); background: transparent; color: var(--bianco); cursor: pointer; }
+.pill.avviso { background: var(--giallo); color: var(--navy); border-color: var(--giallo); }
+
+.body { flex: 1; min-height: 0; overflow: auto; padding: 18px 24px; display: flex; flex-direction: column; gap: 16px; }
+.body > * { flex-shrink: 0; }
+.cerca { min-height: 64px; display: flex; align-items: center; gap: 14px; padding: 0 20px; border: 2px solid var(--navy); border-radius: 10px; color: var(--grigio); font-size: 1em; cursor: text; background: var(--bianco); }
+.cerca svg { color: var(--navy); width: 1.4em; height: 1.4em; }
+
+.emergenza { min-height: 96px; background: var(--rosso); color: var(--bianco); border-radius: 10px; display: flex; align-items: center; gap: 20px; padding: 12px 20px; flex-wrap: wrap; }
+.emergenza .tit { display: flex; align-items: center; gap: 12px; font-family: var(--f-titoli); font-weight: 700; font-size: 1.6em; letter-spacing: .08em; }
+.emergenza .tit svg { width: 1.6em; height: 1.6em; }
+.emergenza .btn { background: var(--bianco); color: var(--rosso); border-color: var(--bianco); min-height: 64px; font-size: 1.05em; }
+
+.griglia { display: grid; gap: 16px; }
+.griglia[data-n="3"] { grid-template-columns: repeat(3, 1fr); }
+.griglia[data-n="4"] { grid-template-columns: repeat(2, 1fr); }
+.griglia[data-n="8"] { grid-template-columns: repeat(4, 1fr); }
+.tile { all: unset; box-sizing: border-box; min-height: 200px; background: var(--navy); color: var(--bianco); border-radius: 12px; padding: 22px; display: flex; flex-direction: column; justify-content: center; gap: 10px; cursor: pointer; }
+.tile svg { width: 64px; height: 64px; color: var(--giallo); stroke-width: 1.6; }
+.tile .nome { font-family: var(--f-titoli); font-weight: 600; font-size: 32px; line-height: 1.1; }
+.device[data-scala="125"] .tile .nome { font-size: 40px; }
+.device[data-scala="150"] .tile .nome { font-size: 48px; }
+.tile .conta { font-size: .95em; color: #d5dde8; }
+
+.blocco-tit { font-family: var(--f-titoli); font-weight: 600; font-size: 1.2em; text-transform: uppercase; letter-spacing: .06em; margin: 0; }
+.recenti { display: flex; gap: 14px; overflow-x: auto; padding-bottom: 6px; }
+.scheda { all: unset; box-sizing: border-box; flex: 0 0 300px; border: 2px solid var(--grigio-chiaro); border-radius: 10px; padding: 14px 16px; display: grid; gap: 4px; cursor: pointer; }
+.scheda .n { font-weight: 600; }
+.scheda .m { color: var(--grigio); font-size: .9em; }
+.badge { display: inline-flex; align-items: center; gap: 6px; font-size: .75em; font-weight: 700; letter-spacing: .05em; padding: 3px 9px; border-radius: 5px; border: 2px solid var(--navy); color: var(--navy); background: var(--bianco); white-space: nowrap; width: max-content; }
+.badge.nuovo { background: var(--giallo); }
+.badge.agg { background: var(--grigio-bg); }
+.badge.emerg { border-color: var(--rosso); color: var(--rosso); }
+.badge.rev { font-weight: 600; }
+
+.footer { flex: none; display: flex; align-items: center; gap: 12px; padding: 10px 24px; border-top: 2px solid var(--grigio-chiaro); }
+.footer .ver { margin-left: auto; font-size: .9em; color: var(--grigio); }
+
+/* elenco */
+.strumenti { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+.filtro { flex: 1 1 340px; min-height: 56px; display: flex; align-items: center; gap: 12px; padding: 0 16px; border: 2px solid var(--navy); border-radius: 8px; color: var(--grigio); }
+.seg { display: flex; border: 2px solid var(--navy); border-radius: 8px; overflow: hidden; }
+.seg button { font: inherit; font-weight: 600; min-height: 52px; padding: 0 18px; border: 0; background: var(--bianco); color: var(--navy); cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }
+.seg button + button { border-left: 2px solid var(--navy); }
+.seg button[aria-pressed="true"] { background: var(--navy); color: var(--bianco); }
+.chips { display: flex; gap: 12px; flex-wrap: wrap; }
+.chip { font: inherit; min-height: 56px; padding: 0 20px; border-radius: 999px; border: 2px solid var(--navy); background: var(--bianco); color: var(--navy); cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }
+.chip[aria-pressed="true"] { background: var(--navy); color: var(--bianco); }
+.lista { display: grid; border-top: 2px solid var(--grigio-chiaro); }
+.riga { all: unset; box-sizing: border-box; min-height: 72px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto auto; align-items: center; gap: 16px; padding: 10px 8px; border-bottom: 2px solid var(--grigio-chiaro); cursor: pointer; }
+.riga .pdf { width: 1.6em; height: 1.6em; color: var(--rosso); }
+.riga .n { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.riga .d { color: var(--grigio); font-size: .9em; white-space: nowrap; }
+.riga .off { display: inline-flex; align-items: center; gap: 6px; color: var(--verde); font-size: .85em; white-space: nowrap; }
+.riga.attesa { cursor: default; color: var(--grigio); background: var(--grigio-bg); }
+.riga.attesa .pdf { color: var(--grigio); }
+.riga.attesa .off { color: var(--grigio); }
+
+/* lettura */
+.lettura { flex: 1; min-height: 0; display: grid; grid-template-columns: 320px minmax(0, 1fr); }
+.pannello { border-right: 2px solid var(--grigio-chiaro); padding: 16px; display: flex; flex-direction: column; gap: 14px; overflow: auto; }
+.rapido { display: grid; gap: 12px; }
+.rapido .btn { justify-content: flex-start; min-height: 64px; font-family: var(--f-titoli); font-size: 1.15em; letter-spacing: .04em; }
+.rapido .btn svg { width: 1.5em; height: 1.5em; }
+.rapido .ps { background: var(--rosso); color: var(--bianco); border-color: var(--rosso); }
+.rapido .ai { background: var(--navy); color: var(--bianco); }
+.rapido .dpi { background: var(--giallo); }
+.sez16 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.sez16 button { font: inherit; min-height: 56px; border: 2px solid var(--navy); border-radius: 8px; background: var(--bianco); color: var(--navy); display: grid; place-items: center; padding: 2px; cursor: pointer; line-height: 1.05; }
+.sez16 b { font-family: var(--f-titoli); font-size: 1.25em; }
+.sez16 span { font-size: 11px; text-align: center; }
+.sez16 button[disabled] { border-style: dashed; color: var(--grigio); cursor: not-allowed; }
+.sez16 button.att { background: var(--navy); color: var(--bianco); }
+.info-doc { display: grid; gap: 6px; font-size: .95em; }
+.info-doc dt { color: var(--grigio); font-size: .85em; }
+.info-doc dd { margin: 0 0 6px; font-weight: 600; }
+.pagine { display: grid; gap: 8px; }
+.pagine button { font: inherit; min-height: 56px; border: 2px solid var(--grigio-chiaro); border-radius: 8px; background: var(--bianco); color: var(--navy); text-align: left; padding: 0 14px; cursor: pointer; }
+.pagine button.att { border-color: var(--navy); font-weight: 600; }
+.offline-ok { margin-top: auto; display: flex; gap: 8px; align-items: center; font-size: .85em; color: var(--verde); border-top: 2px solid var(--grigio-chiaro); padding-top: 12px; }
+.vista { background: #8a96a6; overflow: auto; padding: 20px; display: grid; justify-items: center; align-content: start; gap: 16px; }
+.pagina-pdf { width: 100%; max-width: 860px; aspect-ratio: 210 / 297; background: var(--bianco); box-shadow: 0 2px 10px rgba(0,0,0,.25); padding: 6% 7%; color: #111; font-size: 15px; display: flex; flex-direction: column; gap: 10px; }
+.pagina-pdf h3 { margin: 0; font-size: 18px; border-bottom: 2px solid #111; padding-bottom: 4px; }
+.riga-testo { height: 9px; background: #d4d8de; border-radius: 2px; }
+.barra-inf { flex: none; display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 8px 16px; border-top: 2px solid var(--grigio-chiaro); }
+.barra-inf .gr { display: flex; gap: 12px; align-items: center; }
+.barra-inf .pag { font-weight: 600; min-width: 9em; text-align: center; }
+
+/* stato */
+.stato-main { display: flex; gap: 22px; align-items: center; border: 3px solid var(--navy); border-radius: 12px; padding: 20px 24px; }
+.stato-main > svg { width: 84px; height: 84px; }
+.stato-main.ok > svg { color: var(--verde); }
+.stato-main.ko { border-color: var(--rosso); }
+.stato-main.ko > svg { color: var(--rosso); }
+.stato-main.vecchio { background: var(--giallo); }
+.stato-main h3 { margin: 0 0 6px; font-size: 1.3em; }
+.stato-main dl { display: flex; gap: 28px; flex-wrap: wrap; margin: 0; font-size: .9em; }
+.stato-main dt { color: var(--grigio); }
+.stato-main.vecchio dt { color: var(--navy); }
+.stato-main dd { margin: 0; font-weight: 600; }
+.banner { display: flex; gap: 14px; align-items: flex-start; background: var(--giallo); border: 3px solid var(--navy); border-radius: 10px; padding: 14px 18px; }
+.banner svg { width: 1.6em; height: 1.6em; margin-top: 2px; }
+.banner.rosso { background: var(--bianco); border-color: var(--rosso); }
+.banner.rosso svg { color: var(--rosso); }
+.dett { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 20px; }
+table { width: 100%; border-collapse: collapse; font-size: .9em; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 10px 8px; border-bottom: 2px solid var(--grigio-chiaro); }
+th { font-family: var(--f-titoli); font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--grigio); }
+.esito { display: inline-flex; gap: 6px; align-items: center; font-weight: 600; }
+.esito.ok { color: var(--verde); }
+.esito.ko { color: var(--rosso); }
+.spazio { height: 28px; border: 2px solid var(--navy); border-radius: 6px; overflow: hidden; display: flex; }
+.spazio div { background: var(--navy); }
+.log { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; font-size: .9em; font-variant-numeric: tabular-nums; }
+.azioni { display: flex; gap: 16px; flex-wrap: wrap; }
+
+/* PIN */
+.pin { flex: 1; background: var(--navy); color: var(--bianco); display: grid; place-items: center; padding: 16px; overflow: auto; }
+.pin-box { display: grid; justify-items: center; gap: 18px; }
+.pin h2 { margin: 0; font-family: var(--f-titoli); font-weight: 600; font-size: 1.8em; }
+.pallini { display: flex; gap: 18px; }
+.pallini span { width: 26px; height: 26px; border-radius: 50%; border: 3px solid var(--bianco); }
+.pallini span.p { background: var(--giallo); border-color: var(--giallo); }
+.pallini span.opz { border-style: dashed; opacity: .6; }
+.tastierino { display: grid; grid-template-columns: repeat(3, 96px); gap: 14px; }
+.tastierino button { font: inherit; width: 96px; height: 96px; border-radius: 12px; border: 2px solid rgba(255,255,255,.6); background: var(--navy-2); color: var(--bianco); font-size: 1.6em; font-weight: 600; cursor: pointer; }
+.tastierino button.sm { font-size: .85em; }
+.tastierino button.ok { background: var(--giallo); color: var(--navy); border-color: var(--giallo); }
+.tastierino[aria-disabled="true"] button { opacity: .35; cursor: not-allowed; }
+.msg-pin { min-height: 56px; display: flex; align-items: center; gap: 10px; font-weight: 600; padding: 0 18px; border-radius: 8px; }
+.msg-pin.err { background: var(--bianco); color: var(--rosso); }
+.msg-pin.info { background: var(--giallo); color: var(--navy); }
+.annulla { background: transparent; color: var(--bianco); border-color: var(--bianco); }
+
+/* manutenzione */
+.fascia-man { flex: none; background: var(--giallo); color: var(--navy); display: flex; align-items: center; gap: 14px; padding: 8px 24px; font-weight: 700; letter-spacing: .02em; min-height: 64px; }
+.fascia-man .btn { margin-left: auto; }
+.sez-riga { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 16px; align-items: center; padding: 12px 8px; border-bottom: 2px solid var(--grigio-chiaro); }
+.sez-riga > svg { width: 48px; height: 48px; color: var(--navy); }
+.sez-riga .n { font-weight: 700; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.sez-riga .p { font-family: ui-monospace, Consolas, monospace; font-size: .8em; color: var(--grigio); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sez-riga .b { display: flex; gap: 12px; }
+.disattivo { opacity: .45; pointer-events: none; }
+
+/* form */
+.form { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px 28px; }
+.campo { display: grid; gap: 6px; align-content: start; }
+.campo.largo { grid-column: 1 / -1; }
+.campo label, .campo .lab { font-weight: 600; }
+.campo .aiuto { font-size: .85em; color: var(--grigio); }
+.input { min-height: 56px; border: 2px solid var(--navy); border-radius: 8px; padding: 0 16px; display: flex; align-items: center; font-size: 1em; background: var(--bianco); }
+.input.mono { font-family: ui-monospace, Consolas, monospace; font-size: .9em; }
+.input.vuoto { color: var(--grigio); }
+.input.err { border-color: var(--rosso); border-width: 3px; }
+.campo .msg-err { color: var(--rosso); font-size: .85em; display: flex; gap: 6px; align-items: center; font-weight: 600; }
+.campo .msg-ok { color: var(--verde); font-size: .85em; display: flex; gap: 6px; align-items: center; font-weight: 600; }
+.icone10 { display: grid; grid-template-columns: repeat(10, minmax(56px, 1fr)); gap: 12px; }
+.icone10 button { position: relative; min-height: 64px; border: 2px solid var(--grigio-chiaro); border-radius: 8px; background: var(--bianco); color: var(--navy); display: grid; place-items: center; cursor: pointer; }
+.icone10 button svg { width: 32px; height: 32px; }
+.icone10 button.sel { border: 5px solid var(--navy); background: var(--grigio-bg); }
+.icone10 button.sel::after { content: "✓"; position: absolute; top: -10px; right: -10px; width: 24px; height: 24px; border-radius: 50%; background: var(--navy); color: var(--giallo); font-size: 15px; font-weight: 700; display: grid; place-items: center; }
+.toggle { display: flex; align-items: center; gap: 14px; min-height: 56px; }
+.sw { width: 76px; height: 40px; border-radius: 999px; border: 2px solid var(--navy); position: relative; background: var(--bianco); flex: none; }
+.sw::after { content: ""; position: absolute; top: 4px; left: 4px; width: 28px; height: 28px; border-radius: 50%; background: var(--navy); }
+.sw.on { background: var(--navy); }
+.sw.on::after { left: 40px; background: var(--giallo); }
+.toggle .t { font-weight: 700; min-width: 2em; }
+.prova { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+.esito-prova { display: flex; gap: 10px; align-items: center; font-weight: 600; padding: 10px 16px; border-radius: 8px; border: 2px solid currentColor; }
+.esito-prova.ok { color: var(--verde); }
+.esito-prova.ko { color: var(--rosso); }
+.esito-prova.corso { color: var(--navy); }
+.spinner { width: 1.2em; height: 1.2em; border-radius: 50%; border: 3px solid var(--grigio-chiaro); border-top-color: var(--navy); animation: gira 1s linear infinite; }
+@keyframes gira { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
+
+/* wizard */
+.passi { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.passo { display: flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 999px; border: 2px solid var(--grigio-chiaro); color: var(--grigio); font-weight: 600; }
+.passo.att { border-color: var(--navy); color: var(--navy); background: var(--giallo); }
+.passo.fatto { border-color: var(--navy); color: var(--navy); }
+.wiz { max-width: 760px; width: 100%; margin: 0 auto; display: grid; gap: 22px; }
+.wiz h3 { margin: 0; font-size: 1.4em; }
+.codice { min-height: 88px; font-size: 2em; letter-spacing: .25em; font-family: ui-monospace, Consolas, monospace; justify-content: center; }
+.progress { height: 32px; border: 2px solid var(--navy); border-radius: 8px; overflow: hidden; }
+.progress div { height: 100%; background: var(--navy); }
+.vuoto-home { flex: 1; display: grid; place-items: center; text-align: center; }
+.vuoto-home .c { display: grid; gap: 20px; justify-items: center; max-width: 640px; }
+.vuoto-home svg { width: 96px; height: 96px; }
+.vuoto-home h3 { margin: 0; font-size: 1.6em; }
+
+/* overlay ricerca e conferma */
+.ricerca-top { flex: none; display: flex; gap: 14px; padding: 16px 24px; background: var(--bianco); border-bottom: 2px solid var(--grigio-chiaro); }
+.ricerca-top .cerca { flex: 1; color: var(--navy); }
+.cursore { display: inline-block; width: 2px; height: 1.1em; background: var(--navy); vertical-align: middle; animation: lamp 1s steps(1) infinite; }
+@keyframes lamp { 50% { opacity: 0; } }
+mark { background: var(--giallo); color: var(--navy); padding: 0 2px; border-radius: 2px; }
+.gruppo { display: grid; gap: 0; }
+.gruppo h4 { margin: 0 0 4px; font-family: var(--f-titoli); font-size: 1.05em; text-transform: uppercase; letter-spacing: .06em; color: var(--grigio); display: flex; align-items: center; gap: 8px; }
+.res { min-height: 72px; display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 16px; align-items: center; padding: 8px; border-bottom: 2px solid var(--grigio-chiaro); }
+.res .n { font-weight: 600; }
+.res .s { font-size: .85em; color: var(--grigio); }
+.nessuno { display: grid; justify-items: center; gap: 10px; padding: 60px 0; text-align: center; }
+.nessuno svg { width: 72px; height: 72px; color: var(--grigio); }
+.velo { position: absolute; inset: 0; background: rgba(18, 38, 63, .7); display: grid; place-items: center; padding: 24px; }
+.dialogo { background: var(--bianco); border-radius: 12px; padding: 28px; max-width: 680px; display: grid; gap: 20px; border-top: 8px solid var(--rosso); }
+.dialogo h3 { margin: 0; font-size: 1.3em; }
+.dialogo p { margin: 0; }
+.toast { position: absolute; left: 50%; bottom: 28px; transform: translateX(-50%); background: var(--navy); color: var(--bianco); padding: 14px 22px; border-radius: 10px; display: flex; gap: 10px; align-items: center; font-weight: 600; box-shadow: 0 6px 20px rgba(0,0,0,.3); }
+.toast svg { color: var(--giallo); }
+.ann { position: absolute; right: 12px; top: 84px; max-width: 360px; background: #fffbe6; border: 1px dashed #a07a00; color: #4a3800; font-size: 13px; line-height: 1.4; padding: 8px 10px; border-radius: 6px; font-family: var(--f-testo); z-index: 5; }
+.ann b { display: block; }
+.mostra-ann .ann { display: block; }
+.ann { display: none; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <!-- 10 icone delle sezioni -->
+    <symbol id="ic-documento" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></symbol>
+    <symbol id="ic-flacone" viewBox="0 0 24 24"><path d="M9 3h6M10 3v5L5 18a2 2 0 0 0 1.8 3h10.4A2 2 0 0 0 19 18l-5-10V3"/><path d="M7.5 14h9"/></symbol>
+    <symbol id="ic-scudo" viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/></symbol>
+    <symbol id="ic-fiamma" viewBox="0 0 24 24"><path d="M12 3c1 4 5 6 5 11a5 5 0 0 1-10 0c0-2 1-3.5 2-4.5 0 2 1 3 2 3 0-3-1-5 1-9.5z"/></symbol>
+    <symbol id="ic-croce" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M12 7v10M7 12h10"/></symbol>
+    <symbol id="ic-casco" viewBox="0 0 24 24"><path d="M3 17h18M4 17a8 8 0 0 1 16 0"/><path d="M10 9V6h4v3M12 6v5"/><path d="M3 17v2h18v-2"/></symbol>
+    <symbol id="ic-uscita" viewBox="0 0 24 24"><path d="M14 3H5v18h9"/><path d="M10 12h11M17 8l4 4-4 4"/></symbol>
+    <symbol id="ic-mappa" viewBox="0 0 24 24"><path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14M15 6v14"/></symbol>
+    <symbol id="ic-ingranaggio" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></symbol>
+    <symbol id="ic-cartella" viewBox="0 0 24 24"><path d="M3 6a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+    <!-- icone di interfaccia -->
+    <symbol id="ic-cerca" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></symbol>
+    <symbol id="ic-spunta" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></symbol>
+    <symbol id="ic-sync" viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-14.5-4M4 13a8 8 0 0 0 14.5 4"/><path d="M5 3v4h4M19 21v-4h-4"/></symbol>
+    <symbol id="ic-nuvola-off" viewBox="0 0 24 24"><path d="M7 18h10a4 4 0 0 0 1-7.9A6 6 0 0 0 7.3 8.2 5 5 0 0 0 7 18z"/><path d="M3 3l18 18"/></symbol>
+    <symbol id="ic-avviso" viewBox="0 0 24 24"><path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18v.5"/></symbol>
+    <symbol id="ic-indietro" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></symbol>
+    <symbol id="ic-avanti" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></symbol>
+    <symbol id="ic-pdf" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M8 16v-3h1.5a1 1 0 0 1 0 2H8M12 13v3h1a1.5 1.5 0 0 0 0-3zM16 16v-3h2M16 14.5h1.5"/></symbol>
+    <symbol id="ic-offline" viewBox="0 0 24 24"><path d="M12 4v11M8 11l4 4 4-4"/><path d="M5 20h14"/></symbol>
+    <symbol id="ic-orologio" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+    <symbol id="ic-piu" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="ic-meno" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+    <symbol id="ic-su" viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></symbol>
+    <symbol id="ic-giu" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+    <symbol id="ic-matita" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/></symbol>
+    <symbol id="ic-cestino" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></symbol>
+    <symbol id="ic-lucchetto" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></symbol>
+    <symbol id="ic-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+    <symbol id="ic-errore" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/></symbol>
+    <symbol id="ic-adatta" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></symbol>
+    <symbol id="ic-testo" viewBox="0 0 24 24"><path d="M4 18l5-12 5 12M6 14h6"/><path d="M17 9v6M14 12h6"/></symbol>
+    <symbol id="ic-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></symbol>
+  </defs>
+</svg>
+
+<div class="app">
+  <nav class="nav" aria-label="Schermate">
+    <h1>Totem Sicurezza</h1>
+    <p>Wireframe statici da approvare. Si naviga anche toccando gli elementi dentro lo schermo; la pressione lunga di 2 secondi sul logo apre il PIN.</p>
+    <h2>Risoluzione</h2>
+    <div class="ris" id="ris">
+      <button data-w="1280" data-h="800" aria-current="true">1280×800</button>
+      <button data-w="1366" data-h="768">1366×768</button>
+      <button data-w="1920" data-h="1080">1920×1080</button>
+    </div>
+    <h2>Annotazioni</h2>
+    <div class="ris"><button id="btnAnn" aria-pressed="true">Note visibili</button></div>
+    <div id="elenco"></div>
+    <p class="note">Le date e i documenti sono esempi. Nell'app i font Barlow e Barlow Condensed sono self-hosted; qui arrivano da Google Fonts solo per comodità del wireframe.</p>
+  </nav>
+
+  <main class="stage">
+    <p class="stage-info"><span id="infoSchermata"></span><span id="infoScala"></span></p>
+    <div class="scaler" id="scaler">
+      <div class="device mostra-ann" id="device" data-scala="100">
+
+<!-- ============ 1 HOME ============ -->
+<section class="screen" data-id="home" data-gruppo="1 · Home" data-nome="Home – normale">
+  <header class="topbar">
+    <div class="sx"><div class="logo" data-logo>LOGO</div></div>
+    <h2>Documenti di sicurezza</h2>
+    <div class="dx"><button class="pill" data-vai="stato"><svg class="i"><use href="#ic-spunta"/></svg>Aggiornato alle 08:15</button></div>
+  </header>
+  <div class="body">
+    <div class="cerca" data-vai="ricerca"><svg class="i"><use href="#ic-cerca"/></svg>Cerca un documento o un prodotto</div>
+    <div class="emergenza">
+      <div class="tit"><svg class="i"><use href="#ic-avviso"/></svg>EMERGENZA</div>
+      <button class="btn" data-vai="elenco-emerg"><svg class="i"><use href="#ic-uscita"/></svg>Piani di emergenza</button>
+    </div>
+    <div class="griglia" data-n="3">
+      <button class="tile" data-vai="elenco"><svg class="i"><use href="#ic-flacone"/></svg><span class="nome">Schede di sicurezza</span><span class="conta">42 documenti</span></button>
+      <button class="tile" data-vai="elenco"><svg class="i"><use href="#ic-documento"/></svg><span class="nome">Schede prodotto</span><span class="conta">118 documenti</span></button>
+      <button class="tile" data-vai="elenco-emerg"><svg class="i"><use href="#ic-uscita"/></svg><span class="nome">Piani di emergenza</span><span class="conta">3 documenti</span></button>
+    </div>
+    <h3 class="blocco-tit">Aggiornati di recente</h3>
+    <div class="recenti">
+      <button class="scheda" data-vai="lettura"><span class="badge agg">AGGIORNATO</span><span class="n">Acetone</span><span class="m">Schede di sicurezza · 20/10/2026</span></button>
+      <button class="scheda" data-vai="lettura-altro"><span class="badge nuovo">NUOVO</span><span class="n">Sverniciatore SV 20</span><span class="m">Schede di sicurezza · 18/10/2026</span></button>
+      <button class="scheda" data-vai="lettura-altro"><span class="badge agg">AGGIORNATO</span><span class="n">Piano di evacuazione reparto B</span><span class="m">Piani di emergenza · 14/10/2026</span></button>
+      <button class="scheda" data-vai="lettura-altro"><span class="badge nuovo">NUOVO</span><span class="n">Primer epossidico EP 400</span><span class="m">Schede prodotto · 09/10/2026</span></button>
+      <button class="scheda" data-vai="lettura-altro"><span class="badge agg">AGGIORNATO</span><span class="n">Olio da taglio CUT 32</span><span class="m">Schede di sicurezza · 02/10/2026</span></button>
+    </div>
+  </div>
+  <footer class="footer">
+    <button class="btn" data-ap><svg class="i"><use href="#ic-testo"/></svg>A+</button>
+    <button class="btn" data-vai="stato"><svg class="i"><use href="#ic-info"/></svg>Stato</button>
+    <span class="ver">v1.0.0</span>
+  </footer>
+  <div class="ann"><b>Home</b>Griglia generata dalla configurazione: 3 sezioni in riga, 4 in 2×2, fino a 8 in 4×2. La fascia rossa compare solo se almeno una sezione ha il flag emergenza; con un solo documento il pulsante lo apre direttamente.</div>
+</section>
+
+<section class="screen" data-id="home-4" data-gruppo="1 · Home" data-nome="Home – 4 sezioni (2×2)">
+  <header class="topbar">
+    <div class="sx"><div class="logo" data-logo>LOGO</div></div>
+    <h2>Documenti di sicurezza</h2>
+    <div class="dx"><button class="pill" data-vai="stato"><svg class="i"><use href="#ic-sync"/></svg>Aggiornamento in corso 12/40</button></div>
+  </header>
+  <div class="body">
+    <div class="cerca" data-vai="ricerca"><svg class="i"><use href="#ic-cerca"/></svg>Cerca un documento o un prodotto</div>
+    <div class="emergenza">
+      <div class="tit"><svg class="i"><use href="#ic-avviso"/></svg>EMERGENZA</div>
+      <button class="btn" data-vai="lettura-altro"><svg class="i"><use href="#ic-uscita"/></svg>Piano di emergenza</button>
+      <button class="btn" data-vai="elenco"><svg class="i"><use href="#ic-mappa"/></svg>Planimetrie vie di fuga</button>
+    </div>
+    <div class="griglia" data-n="4">
+      <button class="tile" data-vai="elenco"><svg class="i"><use href="#ic-flacone"/></svg><span class="nome">Schede di sicurezza</span><span class="conta">42 documenti</span></button>
+      <button class="tile" data-vai="elenco"><svg class="i"><use href="#ic-documento"/></svg><span class="nome">Schede prodotto</span><span class="conta">118 documenti</span></button>
+      <button class="tile" data-vai="lettura-altro"><svg class="i"><use href="#ic-uscita"/></svg><span class="nome">Piano di emergenza</span><span class="conta">1 documento</span></button>
+      <button class="tile" aria-disabled="true"><svg class="i"><use href="#ic-mappa"/></svg><span class="nome">Planimetrie vie di fuga</span><span class="conta">Nessun documento</span></button>
+    </div>
+  </div>
+  <footer class="footer">
+    <button class="btn" data-ap><svg class="i"><use href="#ic-testo"/></svg>A+</button>
+    <button class="btn" data-vai="stato"><svg class="i"><use href="#ic-info"/></svg>Stato</button>
+    <span class="ver">v1.0.0</span>
+  </footer>
+  <div class="ann"><b>Varianti mostrate</b>Griglia 2×2, sezione senza documenti ("Nessun documento"), pillola "Aggiornamento in corso". Nessun recente negli ultimi 30 giorni: la fila è nascosta.</div>
+</section>
+
+<section class="screen" data-id="home-offline" data-gruppo="1 · Home" data-nome="Home – offline">
+  <header class="topbar">
+    <div class="sx"><div class="logo" data-logo>LOGO</div></div>
+    <h2>Documenti di sicurezza</h2>
+    <div class="dx"><button class="pill" data-vai="stato-offline"><svg class="i"><use href="#ic-nuvola-off"/></svg>Offline – documenti disponibili</button></div>
+  </header>
+  <div class="body">
+    <div class="cerca" data-vai="ricerca"><svg class="i"><use href="#ic-cerca"/></svg>Cerca un documento o un prodotto</div>
+    <div class="emergenza">
+      <div class="tit"><svg class="i"><use href="#ic-avviso"/></svg>EMERGENZA</div>
+      <button class="btn" data-vai="elenco-emerg"><svg class="i"><use href="#ic-uscita"/></svg>Piani di emergenza</button>
+    </div>
+    <div class="griglia" data-n="3">
+      <button class="tile" data-vai="elenco"><svg class="i"><use href="#ic-flacone"/></svg><span class="nome">Schede di sicurezza</span><span class="conta">42 documenti</span></button>
+      <button class="tile" data-vai="elenco"><svg class="i"><use href="#ic-documento"/></svg><span class="nome">Schede prodotto</span><span class="conta">118 documenti</span></button>
+      <button class="tile" data-vai="elenco-emerg"><svg class="i"><use href="#ic-uscita"/></svg><span class="nome">Piani di emergenza</span><span class="conta">3 documenti</span></button>
+    </div>
+  </div>
+  <footer class="footer">
+    <button class="btn" data-ap><svg class="i"><use href="#ic-testo"/></svg>A+</button>
+    <button class="btn" data-vai="stato-offline"><svg class="i"><use href="#ic-info"/></svg>Stato</button>
+    <span class="ver">v1.0.0</span>
+  </footer>
+  <div class="ann"><b>Offline</b>Tutto funziona dalla cache locale. Cambia solo la pillola in alto a destra.</div>
+</section>
+
+<section class="screen" data-id="home-vecchio" data-gruppo="1 · Home" data-nome="Home – dati vecchi">
+  <header class="topbar">
+    <div class="sx"><div class="logo" data-logo>LOGO</div></div>
+    <h2>Documenti di sicurezza</h2>
+    <div class="dx"><button class="pill avviso" data-vai="stato-vecchio"><svg class="i"><use href="#ic-avviso"/></svg>Ultimo aggiornamento 5 giorni fa</button></div>
+  </header>
+  <div class="body">
+    <div class="cerca" data-vai="ricerca"><svg class="i"><use href="#ic-cerca"/></svg>Cerca un documento o un prodotto</div>
+    <div class="griglia" data-n="3">
+      <button class="tile" data-vai="elenco"><svg class="i"><use href="#ic-flacone"/></svg><span class="nome">Schede di sicurezza</span><span class="conta">42 documenti</span></button>
+      <button class="tile" data-vai="elenco"><svg class="i"><use href="#ic-documento"/></svg><span class="nome">Schede prodotto</span><span class="conta">118 documenti</span></button>
+      <button class="tile" data-vai="elenco"><svg class="i"><use href="#ic-uscita"/></svg><span class="nome">Piani di emergenza</span><span class="conta">3 documenti</span></button>
+    </div>
+  </div>
+  <footer class="footer">
+    <button class="btn" data-ap><svg class="i"><use href="#ic-testo"/></svg>A+</button>
+    <button class="btn" data-vai="stato-vecchio"><svg class="i"><use href="#ic-info"/></svg>Stato</button>
+    <span class="ver">v1.0.0</span>
+  </footer>
+  <div class="ann"><b>Avviso dati vecchi</b>Compare quando l'ultima sync riuscita supera i giorni di avviso (default 3). Icona, testo e sfondo giallo: non solo colore. Qui nessuna sezione ha il flag emergenza, quindi la fascia rossa non c'è.</div>
+</section>
+
+<section class="screen" data-id="home-vuota" data-gruppo="1 · Home" data-nome="Home – non configurato">
+  <header class="topbar">
+    <div class="sx"><div class="logo" data-logo>LOGO</div></div>
+    <h2>Documenti di sicurezza</h2>
+    <div class="dx"></div>
+  </header>
+  <div class="body">
+    <div class="vuoto-home"><div class="c">
+      <svg class="i"><use href="#ic-ingranaggio"/></svg>
+      <h3>Totem non ancora configurato</h3>
+      <p>Per la messa in servizio serve il codice di setup che si trova nei log del server.</p>
+      <button class="btn primario" data-vai="wiz1">Inizia configurazione</button>
+    </div></div>
+  </div>
+  <footer class="footer"><span class="ver">v1.0.0</span></footer>
+</section>
+
+<section class="screen" data-id="ricerca" data-gruppo="1 · Home" data-nome="Ricerca – risultati">
+  <div class="ricerca-top">
+    <div class="cerca"><svg class="i"><use href="#ic-cerca"/></svg><span>aceto<span class="cursore"></span></span></div>
+    <button class="btn primario" data-vai="home"><svg class="i"><use href="#ic-x"/></svg>Chiudi</button>
+  </div>
+  <div class="body">
+    <div class="gruppo">
+      <h4><svg class="i"><use href="#ic-flacone"/></svg>Schede di sicurezza · 2</h4>
+      <div class="res" data-vai="lettura"><div><div class="n"><mark>Aceto</mark>ne</div><div class="s">Schede di sicurezza · Solventi</div></div><span class="badge rev">Rev. 3</span><span class="s">20/10/2026</span></div>
+      <div class="res" data-vai="lettura-altro"><div><div class="n">Diluente nitro con <mark>aceto</mark>ne</div><div class="s">Schede di sicurezza · Solventi</div></div><span class="badge rev">Rev. 1</span><span class="s">03/05/2026</span></div>
+    </div>
+    <div class="gruppo">
+      <h4><svg class="i"><use href="#ic-documento"/></svg>Schede prodotto · 1</h4>
+      <div class="res" data-vai="lettura-altro"><div><div class="n">Sgrassatore <mark>aceto</mark>nico SG 5</div><div class="s">Schede prodotto</div></div><span class="badge rev">Rev. 2</span><span class="s">11/02/2026</span></div>
+    </div>
+  </div>
+  <div class="ann"><b>Ricerca a schermo pieno</b>MiniSearch locale su nomi e metadati, risultati mentre si scrive, raggruppati per sezione. Esc chiude. Sul tablet si apre la tastiera di sistema.</div>
+</section>
+
+<section class="screen" data-id="ricerca-vuota" data-gruppo="1 · Home" data-nome="Ricerca – nessun risultato">
+  <div class="ricerca-top">
+    <div class="cerca"><svg class="i"><use href="#ic-cerca"/></svg><span>sverniciatore rapido gel blu<span class="cursore"></span></span></div>
+    <button class="btn primario" data-vai="home"><svg class="i"><use href="#ic-x"/></svg>Chiudi</button>
+  </div>
+  <div class="body">
+    <div class="nessuno">
+      <svg class="i"><use href="#ic-cerca"/></svg>
+      <strong>Nessun documento trovato</strong>
+      <span>Prova con meno parole, per esempio solo il nome del prodotto.</span>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 2 ELENCO ============ -->
+<section class="screen" data-id="elenco" data-gruppo="2 · Elenco sezione" data-nome="Elenco – con sottocartelle">
+  <header class="topbar">
+    <div class="sx"><button class="btn indietro" data-vai="home"><svg class="i"><use href="#ic-indietro"/></svg>Indietro</button></div>
+    <h2>Schede di sicurezza</h2>
+    <div class="dx"><button class="pill" data-vai="stato"><svg class="i"><use href="#ic-spunta"/></svg>Aggiornato alle 08:15</button></div>
+  </header>
+  <div class="body">
+    <div class="strumenti">
+      <div class="filtro"><svg class="i"><use href="#ic-cerca"/></svg>Filtra in questa sezione</div>
+      <div class="seg" role="group" aria-label="Ordinamento"><button aria-pressed="true">A–Z</button><button aria-pressed="false">Più recenti</button></div>
+    </div>
+    <div class="chips"><button class="chip" aria-pressed="true">Tutte</button><button class="chip" aria-pressed="false"><svg class="i"><use href="#ic-cartella"/></svg>Solventi</button><button class="chip" aria-pressed="false"><svg class="i"><use href="#ic-cartella"/></svg>Vernici</button><button class="chip" aria-pressed="false"><svg class="i"><use href="#ic-cartella"/></svg>Lubrificanti</button></div>
+    <div class="lista">
+      <button class="riga" data-vai="lettura"><svg class="i pdf"><use href="#ic-pdf"/></svg><span class="n">Acetone</span><span class="badge rev">Rev. 3</span><span class="d">20/10/2026</span><span class="off"><svg class="i"><use href="#ic-offline"/></svg>Offline</span></button>
+      <button class="riga" data-vai="lettura-altro"><svg class="i pdf"><use href="#ic-pdf"/></svg><span class="n">Alcool isopropilico</span><span class="badge rev">Rev. 7</span><span class="d">12/06/2026</span><span class="off"><svg class="i"><use href="#ic-offline"/></svg>Offline</span></button>
+      <div class="riga attesa" aria-disabled="true"><svg class="i pdf"><use href="#ic-pdf"/></svg><span class="n">Antiruggine AR 12</span><span class="badge rev">Rev. 2</span><span class="d">24/10/2026</span><span class="off"><svg class="i"><use href="#ic-sync"/></svg>In download…</span></div>
+      <button class="riga" data-vai="lettura-altro"><svg class="i pdf"><use href="#ic-pdf"/></svg><span class="n">Diluente nitro</span><span class="badge rev">Rev. 1</span><span class="d">03/05/2026</span><span class="off"><svg class="i"><use href="#ic-offline"/></svg>Offline</span></button>
+      <button class="riga" data-vai="lettura-altro"><svg class="i pdf"><use href="#ic-pdf"/></svg><span class="n">Olio da taglio CUT 32</span><span class="badge rev">Rev. 4</span><span class="d">02/10/2026</span><span class="off"><svg class="i"><use href="#ic-offline"/></svg>Offline</span></button>
+      <button class="riga" data-vai="lettura-altro"><svg class="i pdf"><use href="#ic-pdf"/></svg><span class="n">Sverniciatore SV 20</span><span class="badge rev">Rev. 1</span><span class="d">18/10/2026</span><span class="off"><svg class="i"><use href="#ic-offline"/></svg>Offline</span></button>
+    </div>
+  </div>
+  <div class="ann"><b>Elenco</b>Righe da 72px. "Antiruggine AR 12" è nel manifest ma non ancora scaricato: grigio, "In download…", non apribile. I chip compaiono solo se la sezione ha sottocartelle.</div>
+</section>
+
+<section class="screen" data-id="elenco-emerg" data-gruppo="2 · Elenco sezione" data-nome="Elenco – senza sottocartelle">
+  <header class="topbar">
+    <div class="sx"><button class="btn indietro" data-vai="home"><svg class="i"><use href="#ic-indietro"/></svg>Indietro</button></div>
+    <h2>Piani di emergenza</h2>
+    <div class="dx"><button class="pill" data-vai="stato"><svg class="i"><use href="#ic-spunta"/></svg>Aggiornato alle 08:15</button></div>
+  </header>
+  <div class="body">
+    <div class="strumenti">
+      <div class="filtro"><svg class="i"><use href="#ic-cerca"/></svg>Filtra in questa sezione</div>
+      <div class="seg" role="group" aria-label="Ordinamento"><button aria-pressed="false">A–Z</button><button aria-pressed="true">Più recenti</button></div>
+    </div>
+    <div class="lista">
+      <button class="riga" data-vai="lettura-altro"><svg class="i pdf"><use href="#ic-pdf"/></svg><span class="n">Piano di evacuazione reparto B</span><span class="badge rev">Rev. 5</span><span class="d">14/10/2026</span><span class="off"><svg class="i"><use href="#ic-offline"/></svg>Offline</span></button>
+      <button class="riga" data-vai="lettura-altro"><svg class="i pdf"><use href="#ic-pdf"/></svg><span class="n">Piano di emergenza generale</span><span class="badge rev">Rev. 9</span><span class="d">01/09/2026</span><span class="off"><svg class="i"><use href="#ic-offline"/></svg>Offline</span></button>
+      <button class="riga" data-vai="lettura-altro"><svg class="i pdf"><use href="#ic-pdf"/></svg><span class="n">Numeri utili e squadra di emergenza</span><span class="badge rev">Rev. 12</span><span class="d">15/07/2026</span><span class="off"><svg class="i"><use href="#ic-offline"/></svg>Offline</span></button>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 3 LETTURA ============ -->
+<section class="screen" data-id="lettura" data-gruppo="3 · Lettura" data-nome="Lettura – SDS riconosciuta">
+  <header class="topbar">
+    <div class="sx"><button class="btn indietro" data-vai="elenco"><svg class="i"><use href="#ic-indietro"/></svg>Indietro</button></div>
+    <h2>Acetone · Schede di sicurezza <span class="badge rev" style="vertical-align:middle">Rev. 3</span></h2>
+    <div class="dx"><button class="pill" data-vai="stato"><svg class="i"><use href="#ic-spunta"/></svg>Aggiornato alle 08:15</button></div>
+  </header>
+  <div class="lettura">
+    <aside class="pannello">
+      <h3 class="blocco-tit">Accesso rapido</h3>
+      <div class="rapido">
+        <button class="btn ps"><svg class="i"><use href="#ic-croce"/></svg>PRIMO SOCCORSO</button>
+        <button class="btn ai"><svg class="i"><use href="#ic-fiamma"/></svg>ANTINCENDIO</button>
+        <button class="btn dpi"><svg class="i"><use href="#ic-casco"/></svg>DPI</button>
+      </div>
+      <h3 class="blocco-tit">Sezioni</h3>
+      <div class="sez16">
+        <button><b>1</b><span>Identific.</span></button>
+        <button><b>2</b><span>Pericoli</span></button>
+        <button><b>3</b><span>Composiz.</span></button>
+        <button class="att"><b>4</b><span>Primo socc.</span></button>
+        <button><b>5</b><span>Antincendio</span></button>
+        <button><b>6</b><span>Rilascio</span></button>
+        <button><b>7</b><span>Stoccaggio</span></button>
+        <button><b>8</b><span>DPI</span></button>
+        <button><b>9</b><span>Proprietà</span></button>
+        <button><b>10</b><span>Reattività</span></button>
+        <button><b>11</b><span>Tossicol.</span></button>
+        <button disabled><b>12</b><span>Ecologia</span></button>
+        <button><b>13</b><span>Smaltim.</span></button>
+        <button><b>14</b><span>Trasporto</span></button>
+        <button><b>15</b><span>Normativa</span></button>
+        <button><b>16</b><span>Altre info</span></button>
+      </div>
+      <div class="offline-ok"><svg class="i"><use href="#ic-offline"/></svg>Disponibile offline – aggiornato il 20/10/2026</div>
+    </aside>
+    <div class="vista">
+      <div class="pagina-pdf">
+        <h3>SEZIONE 4: Misure di primo soccorso</h3>
+        <strong>4.1 Descrizione delle misure di primo soccorso</strong>
+        <div class="riga-testo" style="width:96%"></div><div class="riga-testo" style="width:88%"></div><div class="riga-testo" style="width:92%"></div>
+        <strong>Inalazione</strong>
+        <div class="riga-testo" style="width:90%"></div><div class="riga-testo" style="width:70%"></div>
+        <strong>Contatto con la pelle</strong>
+        <div class="riga-testo" style="width:94%"></div><div class="riga-testo" style="width:84%"></div><div class="riga-testo" style="width:60%"></div>
+        <strong>Contatto con gli occhi</strong>
+        <div class="riga-testo" style="width:95%"></div><div class="riga-testo" style="width:80%"></div>
+        <strong>4.2 Principali sintomi ed effetti</strong>
+        <div class="riga-testo" style="width:91%"></div><div class="riga-testo" style="width:86%"></div><div class="riga-testo" style="width:40%"></div>
+      </div>
+    </div>
+  </div>
+  <div class="barra-inf">
+    <div class="gr"><button class="btn" aria-label="Riduci"><svg class="i"><use href="#ic-meno"/></svg></button><button class="btn" aria-label="Ingrandisci"><svg class="i"><use href="#ic-piu"/></svg></button><button class="btn"><svg class="i"><use href="#ic-adatta"/></svg>Adatta</button></div>
+    <div class="gr"><button class="btn" aria-label="Pagina precedente"><svg class="i"><use href="#ic-indietro"/></svg></button><span class="pag">Pagina 3 di 12</span><button class="btn" aria-label="Pagina successiva"><svg class="i"><use href="#ic-avanti"/></svg></button></div>
+  </div>
+  <div class="ann"><b>SDS riconosciuta</b>Sezioni trovate con pdf.js al momento della sync. La 12 non è stata trovata: visibile ma disattivata (bordo tratteggiato). Pinch, swipe, rotella, trascinamento, Ctrl+rotella e frecce funzionano.</div>
+</section>
+
+<section class="screen" data-id="lettura-altro" data-gruppo="3 · Lettura" data-nome="Lettura – altro documento">
+  <header class="topbar">
+    <div class="sx"><button class="btn indietro" data-vai="elenco-emerg"><svg class="i"><use href="#ic-indietro"/></svg>Indietro</button></div>
+    <h2>Piano di evacuazione reparto B · Piani di emergenza <span class="badge rev" style="vertical-align:middle">Rev. 5</span></h2>
+    <div class="dx"></div>
+  </header>
+  <div class="lettura">
+    <aside class="pannello">
+      <dl class="info-doc">
+        <dt>Revisione</dt><dd>Rev. 5</dd>
+        <dt>Aggiornato il</dt><dd>14/10/2026</dd>
+        <dt>Pagine</dt><dd>4</dd>
+      </dl>
+      <h3 class="blocco-tit">Pagine</h3>
+      <div class="pagine">
+        <button class="att">Pagina 1</button><button>Pagina 2</button><button>Pagina 3</button><button>Pagina 4</button>
+      </div>
+      <div class="offline-ok"><svg class="i"><use href="#ic-offline"/></svg>Disponibile offline – aggiornato il 14/10/2026</div>
+    </aside>
+    <div class="vista">
+      <div class="pagina-pdf">
+        <h3>Piano di evacuazione – Reparto B</h3>
+        <div style="flex:1;border:2px solid #111;display:grid;place-items:center;color:#555">planimetria</div>
+        <div class="riga-testo" style="width:80%"></div><div class="riga-testo" style="width:66%"></div>
+      </div>
+    </div>
+  </div>
+  <div class="barra-inf">
+    <div class="gr"><button class="btn" aria-label="Riduci"><svg class="i"><use href="#ic-meno"/></svg></button><button class="btn" aria-label="Ingrandisci"><svg class="i"><use href="#ic-piu"/></svg></button><button class="btn"><svg class="i"><use href="#ic-adatta"/></svg>Adatta</button></div>
+    <div class="gr"><button class="btn" aria-label="Pagina precedente" disabled><svg class="i"><use href="#ic-indietro"/></svg></button><span class="pag">Pagina 1 di 4</span><button class="btn" aria-label="Pagina successiva"><svg class="i"><use href="#ic-avanti"/></svg></button></div>
+  </div>
+  <div class="ann"><b>Documento normale o SDS non riconosciuta</b>Il pannello mostra revisione, data, numero ed elenco delle pagine. Nel titolo lungo il nome si accorcia con i puntini.</div>
+</section>
+
+<!-- ============ 4 STATO ============ -->
+<section class="screen" data-id="stato" data-gruppo="4 · Stato" data-nome="Stato – share non raggiungibile">
+  <header class="topbar">
+    <div class="sx"><button class="btn indietro" data-vai="home"><svg class="i"><use href="#ic-indietro"/></svg>Indietro</button></div>
+    <h2>Stato e sincronizzazione</h2>
+    <div class="dx"><button class="pill"><svg class="i"><use href="#ic-spunta"/></svg>Aggiornato alle 08:15</button></div>
+  </header>
+  <div class="body">
+    <div class="stato-main ok">
+      <svg class="i"><use href="#ic-spunta"/></svg>
+      <div>
+        <h3>Tutto aggiornato</h3>
+        <dl><div><dt>Ultima sync riuscita</dt><dd>oggi 08:15</dd></div><div><dt>Prossimo tentativo</dt><dd>08:20</dd></div><div><dt>Documenti</dt><dd>163</dd></div></dl>
+      </div>
+    </div>
+    <div class="banner"><svg class="i"><use href="#ic-avviso"/></svg><div>La cartella della sezione «Schede prodotto» non è raggiungibile dal server dalle 07:40. Viene mostrata l'ultima versione disponibile.</div></div>
+    <div class="dett">
+      <div>
+        <h3 class="blocco-tit">Sezioni</h3>
+        <table>
+          <thead><tr><th>Sezione</th><th>Doc.</th><th>Ultima scansione</th><th>Data</th></tr></thead>
+          <tbody>
+            <tr><td>Schede di sicurezza</td><td>42</td><td><span class="esito ok"><svg class="i"><use href="#ic-spunta"/></svg>Riuscita</span></td><td>08:14</td></tr>
+            <tr><td>Schede prodotto</td><td>118</td><td><span class="esito ko"><svg class="i"><use href="#ic-errore"/></svg>Non raggiungibile</span></td><td>08:14</td></tr>
+            <tr><td>Piani di emergenza</td><td>3</td><td><span class="esito ok"><svg class="i"><use href="#ic-spunta"/></svg>Riuscita</span></td><td>08:14</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div style="display:grid;gap:16px;align-content:start">
+        <div>
+          <h3 class="blocco-tit">Spazio</h3>
+          <div class="spazio" role="img" aria-label="Usati 410 MB su 9,2 GB"><div style="width:5%"></div></div>
+          <div style="font-size:.9em">Usati 410 MB · disponibili 8,8 GB</div>
+        </div>
+        <div>
+          <h3 class="blocco-tit">Ultime sincronizzazioni</h3>
+          <ul class="log">
+            <li>08:15 – 3 nuovi, 1 aggiornato, 0 rimossi, 0 errori</li>
+            <li>08:10 – 0 nuovi, 0 aggiornati, 0 rimossi, 0 errori</li>
+            <li>08:05 – 0 nuovi, 0 aggiornati, 0 rimossi, 0 errori</li>
+            <li>07:40 – 0 nuovi, 2 aggiornati, 1 rimosso, 0 errori</li>
+          </ul>
+        </div>
+        <div style="font-size:.85em;color:var(--grigio)">App v1.0.0 · Server v1.0.0 · Piattaforma: windows</div>
+      </div>
+    </div>
+    <div class="azioni">
+      <button class="btn primario"><svg class="i"><use href="#ic-sync"/></svg>Aggiorna ora</button>
+      <button class="btn" data-vai="pin"><svg class="i"><use href="#ic-lucchetto"/></svg>Area manutenzione</button>
+    </div>
+  </div>
+  <div class="ann"><b>Stato</b>Consultabile senza PIN. Un banner per ogni share non raggiungibile. "Aggiorna ora" chiede anche al server una scansione immediata.</div>
+</section>
+
+<section class="screen" data-id="stato-offline" data-gruppo="4 · Stato" data-nome="Stato – server non raggiungibile">
+  <header class="topbar">
+    <div class="sx"><button class="btn indietro" data-vai="home-offline"><svg class="i"><use href="#ic-indietro"/></svg>Indietro</button></div>
+    <h2>Stato e sincronizzazione</h2>
+    <div class="dx"><button class="pill"><svg class="i"><use href="#ic-nuvola-off"/></svg>Offline – documenti disponibili</button></div>
+  </header>
+  <div class="body">
+    <div class="stato-main ko">
+      <svg class="i"><use href="#ic-nuvola-off"/></svg>
+      <div>
+        <h3>Server non raggiungibile – il totem mostra i documenti già scaricati</h3>
+        <dl><div><dt>Ultima sync riuscita</dt><dd>oggi 06:50</dd></div><div><dt>Prossimo tentativo</dt><dd>08:20</dd></div><div><dt>Documenti</dt><dd>163</dd></div></dl>
+      </div>
+    </div>
+    <div class="dett">
+      <div>
+        <h3 class="blocco-tit">Sezioni</h3>
+        <table>
+          <thead><tr><th>Sezione</th><th>Doc.</th><th>Ultima scansione</th><th>Data</th></tr></thead>
+          <tbody>
+            <tr><td>Schede di sicurezza</td><td>42</td><td><span class="esito"><svg class="i"><use href="#ic-info"/></svg>Sconosciuto</span></td><td>–</td></tr>
+            <tr><td>Schede prodotto</td><td>118</td><td><span class="esito"><svg class="i"><use href="#ic-info"/></svg>Sconosciuto</span></td><td>–</td></tr>
+            <tr><td>Piani di emergenza</td><td>3</td><td><span class="esito"><svg class="i"><use href="#ic-info"/></svg>Sconosciuto</span></td><td>–</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div style="display:grid;gap:16px;align-content:start">
+        <div>
+          <h3 class="blocco-tit">Spazio</h3>
+          <div class="spazio" role="img" aria-label="Usati 410 MB su 9,2 GB"><div style="width:5%"></div></div>
+          <div style="font-size:.9em">Usati 410 MB · disponibili 8,8 GB</div>
+        </div>
+        <div style="font-size:.85em;color:var(--grigio)">App v1.0.0 · Server: non raggiungibile · Piattaforma: windows</div>
+      </div>
+    </div>
+    <div class="azioni">
+      <button class="btn primario"><svg class="i"><use href="#ic-sync"/></svg>Aggiorna ora</button>
+      <button class="btn" data-vai="pin-noserver"><svg class="i"><use href="#ic-lucchetto"/></svg>Area manutenzione</button>
+    </div>
+  </div>
+</section>
+
+<section class="screen" data-id="stato-vecchio" data-gruppo="4 · Stato" data-nome="Stato – dati vecchi / spazio esaurito">
+  <header class="topbar">
+    <div class="sx"><button class="btn indietro" data-vai="home-vecchio"><svg class="i"><use href="#ic-indietro"/></svg>Indietro</button></div>
+    <h2>Stato e sincronizzazione</h2>
+    <div class="dx"><button class="pill avviso"><svg class="i"><use href="#ic-avviso"/></svg>Ultimo aggiornamento 5 giorni fa</button></div>
+  </header>
+  <div class="body">
+    <div class="stato-main vecchio">
+      <svg class="i"><use href="#ic-avviso"/></svg>
+      <div>
+        <h3>Ultimo aggiornamento riuscito 5 giorni fa – contattare l'ufficio IT</h3>
+        <dl><div><dt>Ultima sync riuscita</dt><dd>19/10/2026 08:15</dd></div><div><dt>Prossimo tentativo</dt><dd>08:20</dd></div><div><dt>Documenti</dt><dd>163</dd></div></dl>
+      </div>
+    </div>
+    <div class="banner rosso"><svg class="i"><use href="#ic-errore"/></svg><div><strong>Spazio insufficiente sul totem.</strong> Per l'aggiornamento servono 240 MB, ne sono disponibili 90 MB. I documenti attuali restano consultabili.</div></div>
+    <div class="dett">
+      <div>
+        <h3 class="blocco-tit">Spazio</h3>
+        <div class="spazio" role="img" aria-label="Usati 1,9 GB su 2 GB"><div style="width:96%"></div></div>
+        <div style="font-size:.9em">Usati 1,9 GB · disponibili 90 MB</div>
+      </div>
+      <div>
+        <h3 class="blocco-tit">Ultime sincronizzazioni</h3>
+        <ul class="log">
+          <li>08:15 – interrotta: spazio insufficiente</li>
+          <li>08:10 – interrotta: spazio insufficiente</li>
+        </ul>
+      </div>
+    </div>
+    <div class="azioni">
+      <button class="btn primario"><svg class="i"><use href="#ic-sync"/></svg>Aggiorna ora</button>
+      <button class="btn" data-vai="pin"><svg class="i"><use href="#ic-lucchetto"/></svg>Area manutenzione</button>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 5 PIN ============ -->
+<section class="screen" data-id="pin" data-gruppo="5 · PIN" data-nome="PIN – inserimento / errore">
+  <div class="pin"><div class="pin-box">
+    <h2>Inserisci il PIN di manutenzione</h2>
+    <div class="pallini"><span class="p"></span><span class="p"></span><span></span><span></span><span class="opz"></span><span class="opz"></span></div>
+    <div class="msg-pin err"><svg class="i"><use href="#ic-errore"/></svg>PIN errato – restano 3 tentativi</div>
+    <div class="tastierino">
+      <button>1</button><button>2</button><button>3</button><button>4</button><button>5</button><button>6</button><button>7</button><button>8</button><button>9</button>
+      <button class="sm">Cancella</button><button>0</button><button class="ok sm" data-vai="manut">OK</button>
+    </div>
+    <button class="btn annulla" data-vai="home">Annulla</button>
+  </div></div>
+  <div class="ann"><b>Tastierino</b>4-6 cifre: i pallini tratteggiati sono le cifre facoltative. Funziona anche con tasti numerici, Invio e Backspace. OK porta alla manutenzione in questo wireframe.</div>
+</section>
+
+<section class="screen" data-id="pin-blocco" data-gruppo="5 · PIN" data-nome="PIN – blocco">
+  <div class="pin"><div class="pin-box">
+    <h2>Inserisci il PIN di manutenzione</h2>
+    <div class="pallini"><span></span><span></span><span></span><span></span><span class="opz"></span><span class="opz"></span></div>
+    <div class="msg-pin info"><svg class="i"><use href="#ic-orologio"/></svg>Troppi tentativi. Riprova tra 4:32</div>
+    <div class="tastierino" aria-disabled="true">
+      <button disabled>1</button><button disabled>2</button><button disabled>3</button><button disabled>4</button><button disabled>5</button><button disabled>6</button><button disabled>7</button><button disabled>8</button><button disabled>9</button>
+      <button class="sm" disabled>Cancella</button><button disabled>0</button><button class="ok sm" disabled>OK</button>
+    </div>
+    <button class="btn annulla" data-vai="home">Annulla</button>
+  </div></div>
+</section>
+
+<section class="screen" data-id="pin-noserver" data-gruppo="5 · PIN" data-nome="PIN – senza server">
+  <div class="pin"><div class="pin-box">
+    <h2>Inserisci il PIN di manutenzione</h2>
+    <div class="pallini"><span></span><span></span><span></span><span></span><span class="opz"></span><span class="opz"></span></div>
+    <div class="msg-pin info"><svg class="i"><use href="#ic-nuvola-off"/></svg>Manutenzione disponibile solo con il server raggiungibile</div>
+    <div class="tastierino" aria-disabled="true">
+      <button disabled>1</button><button disabled>2</button><button disabled>3</button><button disabled>4</button><button disabled>5</button><button disabled>6</button><button disabled>7</button><button disabled>8</button><button disabled>9</button>
+      <button class="sm" disabled>Cancella</button><button disabled>0</button><button class="ok sm" disabled>OK</button>
+    </div>
+    <button class="btn annulla" data-vai="home-offline">Annulla</button>
+  </div></div>
+</section>
+
+<!-- ============ 6 MANUTENZIONE ============ -->
+<section class="screen" data-id="manut" data-gruppo="6 · Manutenzione" data-nome="Configurazione sezioni">
+  <header class="topbar">
+    <div class="sx"><div class="logo">LOGO</div></div>
+    <h2>Configurazione sezioni</h2>
+    <div class="dx"></div>
+  </header>
+  <div class="fascia-man"><svg class="i"><use href="#ic-ingranaggio"/></svg>MODALITÀ MANUTENZIONE – uscita automatica dopo 10 minuti di inattività<button class="btn primario" data-vai="home">Esci</button></div>
+  <div class="body">
+    <div>
+      <div class="sez-riga"><svg class="i"><use href="#ic-flacone"/></svg><div style="min-width:0"><div class="n">Schede di sicurezza <span style="font-weight:400;color:var(--grigio)">· 42 documenti</span></div><div class="p">\\fileserver\HSE\SDS</div></div>
+        <div class="b"><button class="btn" aria-label="Sposta su" disabled><svg class="i"><use href="#ic-su"/></svg></button><button class="btn" aria-label="Sposta giù"><svg class="i"><use href="#ic-giu"/></svg></button><button class="btn" data-vai="form"><svg class="i"><use href="#ic-matita"/></svg>Modifica</button><button class="btn" data-vai="conferma"><svg class="i"><use href="#ic-cestino"/></svg>Elimina</button></div></div>
+      <div class="sez-riga"><svg class="i"><use href="#ic-documento"/></svg><div style="min-width:0"><div class="n">Schede prodotto <span style="font-weight:400;color:var(--grigio)">· 118 documenti</span></div><div class="p">\\fileserver\Tecnico\SchedeProdotto</div></div>
+        <div class="b"><button class="btn" aria-label="Sposta su"><svg class="i"><use href="#ic-su"/></svg></button><button class="btn" aria-label="Sposta giù"><svg class="i"><use href="#ic-giu"/></svg></button><button class="btn" data-vai="form"><svg class="i"><use href="#ic-matita"/></svg>Modifica</button><button class="btn" data-vai="conferma"><svg class="i"><use href="#ic-cestino"/></svg>Elimina</button></div></div>
+      <div class="sez-riga"><svg class="i"><use href="#ic-uscita"/></svg><div style="min-width:0"><div class="n">Piani di emergenza <span class="badge emerg">EMERGENZA</span> <span style="font-weight:400;color:var(--grigio)">· 3 documenti</span></div><div class="p">\\fileserver\HSE\Emergenza</div></div>
+        <div class="b"><button class="btn" aria-label="Sposta su"><svg class="i"><use href="#ic-su"/></svg></button><button class="btn" aria-label="Sposta giù" disabled><svg class="i"><use href="#ic-giu"/></svg></button><button class="btn" data-vai="form"><svg class="i"><use href="#ic-matita"/></svg>Modifica</button><button class="btn" data-vai="conferma"><svg class="i"><use href="#ic-cestino"/></svg>Elimina</button></div></div>
+    </div>
+    <div class="azioni">
+      <button class="btn primario" data-vai="form-nuovo"><svg class="i"><use href="#ic-piu"/></svg>Aggiungi sezione</button>
+      <button class="btn" data-vai="cambia-pin"><svg class="i"><use href="#ic-lucchetto"/></svg>Cambia PIN</button>
+    </div>
+  </div>
+  <div class="ann"><b>Manutenzione</b>Riordino solo con ▲ ▼. Il logo qui non reagisce alla pressione lunga. Il token di manutenzione scade dopo 10 minuti di inattività anche lato server.</div>
+</section>
+
+<section class="screen" data-id="conferma" data-gruppo="6 · Manutenzione" data-nome="Conferma eliminazione">
+  <header class="topbar">
+    <div class="sx"><div class="logo">LOGO</div></div>
+    <h2>Configurazione sezioni</h2>
+    <div class="dx"></div>
+  </header>
+  <div class="fascia-man"><svg class="i"><use href="#ic-ingranaggio"/></svg>MODALITÀ MANUTENZIONE – uscita automatica dopo 10 minuti di inattività<button class="btn primario">Esci</button></div>
+  <div class="body"></div>
+  <div class="velo"><div class="dialogo" role="dialog" aria-labelledby="dlgT">
+    <h3 id="dlgT">Eliminare la sezione «Schede prodotto»?</h3>
+    <p>I suoi documenti spariranno dal totem alla prossima sincronizzazione. Le cartelle di rete non vengono toccate.</p>
+    <div class="azioni"><button class="btn rosso" data-vai="manut"><svg class="i"><use href="#ic-cestino"/></svg>Elimina</button><button class="btn" data-vai="manut">Annulla</button></div>
+  </div></div>
+</section>
+
+<section class="screen" data-id="cambia-pin" data-gruppo="6 · Manutenzione" data-nome="Cambia PIN">
+  <header class="topbar">
+    <div class="sx"><button class="btn indietro" data-vai="manut"><svg class="i"><use href="#ic-indietro"/></svg>Indietro</button></div>
+    <h2>Cambia PIN</h2>
+    <div class="dx"></div>
+  </header>
+  <div class="fascia-man"><svg class="i"><use href="#ic-ingranaggio"/></svg>MODALITÀ MANUTENZIONE – uscita automatica dopo 10 minuti di inattività<button class="btn primario" data-vai="home">Esci</button></div>
+  <div class="body"><div class="wiz">
+    <div class="passi"><span class="passo fatto"><svg class="i"><use href="#ic-spunta"/></svg>PIN attuale</span><span class="passo att">Nuovo PIN</span><span class="passo">Conferma</span></div>
+    <h3>Inserisci il nuovo PIN (da 4 a 6 cifre)</h3>
+    <div class="pallini" style="justify-content:center"><span class="p" style="border-color:var(--navy)"></span><span class="p" style="border-color:var(--navy)"></span><span class="p" style="border-color:var(--navy)"></span><span style="border-color:var(--navy)"></span><span style="border-color:var(--navy);border-style:dashed"></span><span style="border-color:var(--navy);border-style:dashed"></span></div>
+    <p style="margin:0;text-align:center;color:var(--grigio)">Si usa lo stesso tastierino a schermo pieno della schermata PIN, con il titolo del passo corrente.</p>
+    <div class="azioni" style="justify-content:center"><button class="btn primario" data-vai="manut">Avanti</button><button class="btn" data-vai="manut">Annulla</button></div>
+  </div></div>
+</section>
+
+<section class="screen" data-id="manut-offline" data-gruppo="6 · Manutenzione" data-nome="Manutenzione – server non raggiungibile">
+  <header class="topbar">
+    <div class="sx"><div class="logo">LOGO</div></div>
+    <h2>Configurazione sezioni</h2>
+    <div class="dx"><button class="pill"><svg class="i"><use href="#ic-nuvola-off"/></svg>Offline – documenti disponibili</button></div>
+  </header>
+  <div class="fascia-man"><svg class="i"><use href="#ic-ingranaggio"/></svg>MODALITÀ MANUTENZIONE – uscita automatica dopo 10 minuti di inattività<button class="btn primario" data-vai="home">Esci</button></div>
+  <div class="body">
+    <div class="banner rosso"><svg class="i"><use href="#ic-nuvola-off"/></svg><div><strong>Server non raggiungibile.</strong> La configurazione si modifica solo con il server raggiungibile. Le sezioni qui sotto sono in sola lettura.</div></div>
+    <div class="disattivo">
+      <div class="sez-riga"><svg class="i"><use href="#ic-flacone"/></svg><div style="min-width:0"><div class="n">Schede di sicurezza</div><div class="p">\\fileserver\HSE\SDS</div></div>
+        <div class="b"><button class="btn" disabled><svg class="i"><use href="#ic-su"/></svg></button><button class="btn" disabled><svg class="i"><use href="#ic-giu"/></svg></button><button class="btn" disabled>Modifica</button><button class="btn" disabled>Elimina</button></div></div>
+      <div class="sez-riga"><svg class="i"><use href="#ic-documento"/></svg><div style="min-width:0"><div class="n">Schede prodotto</div><div class="p">\\fileserver\Tecnico\SchedeProdotto</div></div>
+        <div class="b"><button class="btn" disabled><svg class="i"><use href="#ic-su"/></svg></button><button class="btn" disabled><svg class="i"><use href="#ic-giu"/></svg></button><button class="btn" disabled>Modifica</button><button class="btn" disabled>Elimina</button></div></div>
+    </div>
+    <div class="azioni disattivo"><button class="btn primario" disabled>Aggiungi sezione</button><button class="btn" disabled>Cambia PIN</button></div>
+  </div>
+  <div class="ann"><b>Quando si vede</b>Il server cade mentre la manutenzione è aperta: tutto si disattiva con il banner. Senza server la manutenzione non si apre proprio (vedi PIN – senza server).</div>
+</section>
+
+<!-- ============ 7 FORM ============ -->
+<section class="screen" data-id="form" data-gruppo="7 · Form sezione" data-nome="Form – modifica, prova riuscita">
+  <header class="topbar">
+    <div class="sx"><button class="btn indietro" data-vai="manut"><svg class="i"><use href="#ic-indietro"/></svg>Indietro</button></div>
+    <h2>Modifica sezione</h2>
+    <div class="dx"></div>
+  </header>
+  <div class="fascia-man"><svg class="i"><use href="#ic-ingranaggio"/></svg>MODALITÀ MANUTENZIONE – uscita automatica dopo 10 minuti di inattività<button class="btn primario" data-vai="home">Esci</button></div>
+  <div class="body">
+    <div class="form">
+      <div class="campo"><label>Nome</label><div class="input">Schede prodotto</div><span class="aiuto">15 di 30 caratteri</span></div>
+      <div class="campo"><span class="lab">Sezione di emergenza</span><div class="toggle"><span class="sw"></span><span class="t">No</span><span class="aiuto">Compare nella fascia rossa della Home</span></div></div>
+      <div class="campo largo"><span class="lab">Icona</span>
+        <div class="icone10">
+          <button aria-label="Documento" class="sel"><svg class="i"><use href="#ic-documento"/></svg></button>
+          <button aria-label="Flacone chimico"><svg class="i"><use href="#ic-flacone"/></svg></button>
+          <button aria-label="Scudo"><svg class="i"><use href="#ic-scudo"/></svg></button>
+          <button aria-label="Fiamma"><svg class="i"><use href="#ic-fiamma"/></svg></button>
+          <button aria-label="Primo soccorso"><svg class="i"><use href="#ic-croce"/></svg></button>
+          <button aria-label="Casco DPI"><svg class="i"><use href="#ic-casco"/></svg></button>
+          <button aria-label="Uscita di emergenza"><svg class="i"><use href="#ic-uscita"/></svg></button>
+          <button aria-label="Mappa"><svg class="i"><use href="#ic-mappa"/></svg></button>
+          <button aria-label="Ingranaggio"><svg class="i"><use href="#ic-ingranaggio"/></svg></button>
+          <button aria-label="Cartella"><svg class="i"><use href="#ic-cartella"/></svg></button>
+        </div>
+      </div>
+      <div class="campo largo"><label>Percorso della share</label><div class="input mono">\\fileserver\Tecnico\SchedeProdotto</div><span class="msg-ok"><svg class="i"><use href="#ic-spunta"/></svg>Formato corretto. Esempio: \\server\condivisione\cartella</span></div>
+      <div class="campo"><label>Utente</label><div class="input mono">AZIENDA\svc-totem</div><span class="aiuto">Formato: DOMINIO\utente</span></div>
+      <div class="campo"><label>Password</label><div class="input">••••••••••</div><span class="aiuto">Lascia vuoto per non cambiarla</span></div>
+      <div class="campo"><span class="lab">Includi sottocartelle</span><div class="toggle"><span class="sw on"></span><span class="t">Sì</span></div></div>
+      <div class="campo largo prova"><button class="btn"><svg class="i"><use href="#ic-sync"/></svg>Prova connessione</button><span class="esito-prova ok"><svg class="i"><use href="#ic-spunta"/></svg>Connessione riuscita: trovati 118 PDF</span></div>
+    </div>
+    <div class="azioni"><button class="btn primario" data-vai="manut-salvata"><svg class="i"><use href="#ic-spunta"/></svg>Salva</button><button class="btn" data-vai="manut">Annulla</button></div>
+  </div>
+  <div class="ann"><b>Salva</b>Attivo perché la password è cambiata e la prova è riuscita. Se cambiano solo nome, icona, emergenza o sottocartelle, Salva è attivo senza prova. Il server ricontrolla la regola.</div>
+</section>
+
+<section class="screen" data-id="form-nuovo" data-gruppo="7 · Form sezione" data-nome="Form – nuova, errori">
+  <header class="topbar">
+    <div class="sx"><button class="btn indietro" data-vai="manut"><svg class="i"><use href="#ic-indietro"/></svg>Indietro</button></div>
+    <h2>Nuova sezione</h2>
+    <div class="dx"></div>
+  </header>
+  <div class="fascia-man"><svg class="i"><use href="#ic-ingranaggio"/></svg>MODALITÀ MANUTENZIONE – uscita automatica dopo 10 minuti di inattività<button class="btn primario" data-vai="home">Esci</button></div>
+  <div class="body">
+    <div class="form">
+      <div class="campo"><label>Nome</label><div class="input">Planimetrie vie di fuga</div><span class="aiuto">23 di 30 caratteri</span></div>
+      <div class="campo"><span class="lab">Sezione di emergenza</span><div class="toggle"><span class="sw on"></span><span class="t">Sì</span><span class="aiuto">Compare nella fascia rossa della Home</span></div></div>
+      <div class="campo largo"><span class="lab">Icona</span>
+        <div class="icone10">
+          <button aria-label="Documento"><svg class="i"><use href="#ic-documento"/></svg></button>
+          <button aria-label="Flacone chimico"><svg class="i"><use href="#ic-flacone"/></svg></button>
+          <button aria-label="Scudo"><svg class="i"><use href="#ic-scudo"/></svg></button>
+          <button aria-label="Fiamma"><svg class="i"><use href="#ic-fiamma"/></svg></button>
+          <button aria-label="Primo soccorso"><svg class="i"><use href="#ic-croce"/></svg></button>
+          <button aria-label="Casco DPI"><svg class="i"><use href="#ic-casco"/></svg></button>
+          <button aria-label="Uscita di emergenza"><svg class="i"><use href="#ic-uscita"/></svg></button>
+          <button aria-label="Mappa" class="sel"><svg class="i"><use href="#ic-mappa"/></svg></button>
+          <button aria-label="Ingranaggio"><svg class="i"><use href="#ic-ingranaggio"/></svg></button>
+          <button aria-label="Cartella"><svg class="i"><use href="#ic-cartella"/></svg></button>
+        </div>
+      </div>
+      <div class="campo largo"><label>Percorso della share</label><div class="input mono err">fileserver/HSE/Planimetrie</div><span class="msg-err"><svg class="i"><use href="#ic-errore"/></svg>Il percorso deve iniziare con \\ e usare \. Esempio: \\server\condivisione\cartella</span></div>
+      <div class="campo"><label>Utente</label><div class="input mono">AZIENDA\svc-totem</div><span class="aiuto">Formato: DOMINIO\utente</span></div>
+      <div class="campo"><label>Password</label><div class="input">••••••••••</div></div>
+      <div class="campo"><span class="lab">Includi sottocartelle</span><div class="toggle"><span class="sw on"></span><span class="t">Sì</span></div></div>
+      <div class="campo largo prova"><button class="btn" disabled><svg class="i"><use href="#ic-sync"/></svg>Prova connessione</button><span class="esito-prova corso"><span class="spinner"></span>Connessione in corso…</span></div>
+      <div class="campo largo" style="gap:10px">
+        <span class="lab">Altri esiti possibili della prova</span>
+        <div style="display:flex;gap:12px;flex-wrap:wrap">
+          <span class="esito-prova ko"><svg class="i"><use href="#ic-lucchetto"/></svg>Utente o password errati</span>
+          <span class="esito-prova ko"><svg class="i"><use href="#ic-cartella"/></svg>Cartella non trovata: controlla il percorso</span>
+          <span class="esito-prova ko"><svg class="i"><use href="#ic-nuvola-off"/></svg>Server non raggiungibile in rete</span>
+          <span class="esito-prova ko"><svg class="i"><use href="#ic-errore"/></svg>Accesso negato alla cartella</span>
+          <span class="esito-prova ko"><svg class="i"><use href="#ic-orologio"/></svg>Tempo scaduto</span>
+        </div>
+      </div>
+    </div>
+    <div class="azioni"><button class="btn primario" disabled><svg class="i"><use href="#ic-spunta"/></svg>Salva</button><button class="btn" data-vai="manut">Annulla</button></div>
+  </div>
+  <div class="ann"><b>Errori</b>Controllo del formato mentre si scrive (bordo spesso, icona e testo). Durante la prova il pulsante si disattiva. Salva resta disattivato finché la prova non riesce.</div>
+</section>
+
+<section class="screen" data-id="manut-salvata" data-gruppo="7 · Form sezione" data-nome="Dopo il salvataggio">
+  <header class="topbar">
+    <div class="sx"><div class="logo">LOGO</div></div>
+    <h2>Configurazione sezioni</h2>
+    <div class="dx"><button class="pill"><svg class="i"><use href="#ic-sync"/></svg>Aggiornamento in corso 3/118</button></div>
+  </header>
+  <div class="fascia-man"><svg class="i"><use href="#ic-ingranaggio"/></svg>MODALITÀ MANUTENZIONE – uscita automatica dopo 10 minuti di inattività<button class="btn primario" data-vai="home">Esci</button></div>
+  <div class="body">
+    <div>
+      <div class="sez-riga"><svg class="i"><use href="#ic-flacone"/></svg><div style="min-width:0"><div class="n">Schede di sicurezza</div><div class="p">\\fileserver\HSE\SDS</div></div><div class="b"><button class="btn" disabled><svg class="i"><use href="#ic-su"/></svg></button><button class="btn"><svg class="i"><use href="#ic-giu"/></svg></button><button class="btn">Modifica</button><button class="btn">Elimina</button></div></div>
+      <div class="sez-riga"><svg class="i"><use href="#ic-documento"/></svg><div style="min-width:0"><div class="n">Schede prodotto</div><div class="p">\\fileserver\Tecnico\SchedeProdotto</div></div><div class="b"><button class="btn"><svg class="i"><use href="#ic-su"/></svg></button><button class="btn"><svg class="i"><use href="#ic-giu"/></svg></button><button class="btn">Modifica</button><button class="btn">Elimina</button></div></div>
+    </div>
+  </div>
+  <div class="toast"><svg class="i"><use href="#ic-spunta"/></svg>Sezione salvata, aggiornamento in corso</div>
+</section>
+
+<!-- ============ 8 WIZARD ============ -->
+<section class="screen" data-id="wiz1" data-gruppo="8 · Primo avvio" data-nome="Passo 1 – codice di setup">
+  <header class="topbar"><div class="sx"><div class="logo">LOGO</div></div><h2>Messa in servizio</h2><div class="dx"></div></header>
+  <div class="body"><div class="wiz">
+    <div class="passi"><span class="passo att">Passo 1 di 4 · Codice</span><span class="passo">PIN</span><span class="passo">Prima sezione</span><span class="passo">Prima sincronizzazione</span></div>
+    <h3>Codice di setup</h3>
+    <div class="input codice">K7QM-4XPA</div>
+    <p style="margin:0">Il codice si trova nei log del server: <code>docker compose logs totem</code></p>
+    <div class="azioni"><button class="btn primario" data-vai="wiz2"><svg class="i"><use href="#ic-avanti"/></svg>Avanti</button><button class="btn" data-vai="home-vuota">Annulla</button></div>
+  </div></div>
+  <div class="ann"><b>Codice</b>8 caratteri senza lettere ambigue (niente 0/O, 1/I). Monouso; dopo 5 errori blocco di 5 minuti come per il PIN. Si scrive anche da tastiera fisica.</div>
+</section>
+
+<section class="screen" data-id="wiz2" data-gruppo="8 · Primo avvio" data-nome="Passo 2 – PIN">
+  <header class="topbar"><div class="sx"><div class="logo">LOGO</div></div><h2>Messa in servizio</h2><div class="dx"></div></header>
+  <div class="body"><div class="wiz">
+    <div class="passi"><span class="passo fatto"><svg class="i"><use href="#ic-spunta"/></svg>Codice</span><span class="passo att">Passo 2 di 4 · PIN</span><span class="passo">Prima sezione</span><span class="passo">Prima sincronizzazione</span></div>
+    <h3>Crea il PIN di manutenzione (da 4 a 6 cifre), poi confermalo</h3>
+    <div class="pallini" style="justify-content:center"><span class="p" style="border-color:var(--navy)"></span><span class="p" style="border-color:var(--navy)"></span><span class="p" style="border-color:var(--navy)"></span><span class="p" style="border-color:var(--navy)"></span><span style="border-color:var(--navy);border-style:dashed"></span><span style="border-color:var(--navy);border-style:dashed"></span></div>
+    <p style="margin:0;color:var(--grigio)">Se il PIN esiste già (sostituzione del totem), questo passo chiede invece il PIN attuale e il passo 3 si salta perché le sezioni esistono.</p>
+    <div class="azioni"><button class="btn primario" data-vai="wiz3"><svg class="i"><use href="#ic-avanti"/></svg>Avanti</button><button class="btn" data-vai="wiz1">Indietro</button></div>
+  </div></div>
+</section>
+
+<section class="screen" data-id="wiz3" data-gruppo="8 · Primo avvio" data-nome="Passo 3 – prima sezione">
+  <header class="topbar"><div class="sx"><div class="logo">LOGO</div></div><h2>Messa in servizio</h2><div class="dx"></div></header>
+  <div class="body">
+    <div class="passi"><span class="passo fatto"><svg class="i"><use href="#ic-spunta"/></svg>Codice</span><span class="passo fatto"><svg class="i"><use href="#ic-spunta"/></svg>PIN</span><span class="passo att">Passo 3 di 4 · Prima sezione</span><span class="passo">Prima sincronizzazione</span></div>
+    <div class="form">
+      <div class="campo"><label>Nome</label><div class="input">Schede di sicurezza</div></div>
+      <div class="campo"><span class="lab">Sezione di emergenza</span><div class="toggle"><span class="sw"></span><span class="t">No</span><span class="aiuto">Compare nella fascia rossa della Home</span></div></div>
+      <div class="campo largo"><span class="lab">Icona</span>
+        <div class="icone10">
+          <button aria-label="Documento"><svg class="i"><use href="#ic-documento"/></svg></button><button aria-label="Flacone chimico" class="sel"><svg class="i"><use href="#ic-flacone"/></svg></button><button aria-label="Scudo"><svg class="i"><use href="#ic-scudo"/></svg></button><button aria-label="Fiamma"><svg class="i"><use href="#ic-fiamma"/></svg></button><button aria-label="Primo soccorso"><svg class="i"><use href="#ic-croce"/></svg></button><button aria-label="Casco DPI"><svg class="i"><use href="#ic-casco"/></svg></button><button aria-label="Uscita di emergenza"><svg class="i"><use href="#ic-uscita"/></svg></button><button aria-label="Mappa"><svg class="i"><use href="#ic-mappa"/></svg></button><button aria-label="Ingranaggio"><svg class="i"><use href="#ic-ingranaggio"/></svg></button><button aria-label="Cartella"><svg class="i"><use href="#ic-cartella"/></svg></button>
+        </div>
+      </div>
+      <div class="campo largo"><label>Percorso della share</label><div class="input mono">\\fileserver\HSE\SDS</div></div>
+      <div class="campo"><label>Utente</label><div class="input mono">AZIENDA\svc-totem</div><span class="aiuto">Formato: DOMINIO\utente</span></div>
+      <div class="campo"><label>Password</label><div class="input">••••••••••</div></div>
+      <div class="campo largo prova"><button class="btn"><svg class="i"><use href="#ic-sync"/></svg>Prova connessione</button><span class="esito-prova ok"><svg class="i"><use href="#ic-spunta"/></svg>Connessione riuscita: trovati 42 PDF</span></div>
+    </div>
+    <div class="azioni"><button class="btn primario" data-vai="wiz4"><svg class="i"><use href="#ic-spunta"/></svg>Salva e continua</button><button class="btn" data-vai="wiz2">Indietro</button></div>
+  </div>
+</section>
+
+<section class="screen" data-id="wiz4" data-gruppo="8 · Primo avvio" data-nome="Passo 4 – prima sincronizzazione">
+  <header class="topbar"><div class="sx"><div class="logo">LOGO</div></div><h2>Messa in servizio</h2><div class="dx"></div></header>
+  <div class="body"><div class="wiz">
+    <div class="passi"><span class="passo fatto"><svg class="i"><use href="#ic-spunta"/></svg>Codice</span><span class="passo fatto"><svg class="i"><use href="#ic-spunta"/></svg>PIN</span><span class="passo fatto"><svg class="i"><use href="#ic-spunta"/></svg>Prima sezione</span><span class="passo att">Passo 4 di 4 · Sincronizzazione</span></div>
+    <h3>Prima sincronizzazione</h3>
+    <div class="progress" role="progressbar" aria-valuenow="28" aria-valuemin="0" aria-valuemax="100"><div style="width:28%"></div></div>
+    <p style="margin:0;font-weight:600">Scaricati 12 di 87 documenti (34 MB di 120 MB)</p>
+    <p style="margin:0;color:var(--grigio)">La Home si apre da sola quando la sincronizzazione è completa.</p>
+    <div class="azioni"><button class="btn" data-vai="wiz4-err">Simula errore</button><button class="btn primario" data-vai="home">Simula completamento</button></div>
+  </div></div>
+</section>
+
+<section class="screen" data-id="wiz4-err" data-gruppo="8 · Primo avvio" data-nome="Passo 4 – errore">
+  <header class="topbar"><div class="sx"><div class="logo">LOGO</div></div><h2>Messa in servizio</h2><div class="dx"></div></header>
+  <div class="body"><div class="wiz">
+    <div class="passi"><span class="passo fatto"><svg class="i"><use href="#ic-spunta"/></svg>Codice</span><span class="passo fatto"><svg class="i"><use href="#ic-spunta"/></svg>PIN</span><span class="passo fatto"><svg class="i"><use href="#ic-spunta"/></svg>Prima sezione</span><span class="passo att">Passo 4 di 4 · Sincronizzazione</span></div>
+    <h3>Prima sincronizzazione</h3>
+    <div class="banner rosso"><svg class="i"><use href="#ic-errore"/></svg><div><strong>Sincronizzazione interrotta: server non raggiungibile.</strong> Controlla la rete del totem e riprova. I 12 documenti già scaricati restano salvati.</div></div>
+    <div class="azioni"><button class="btn primario" data-vai="wiz4"><svg class="i"><use href="#ic-sync"/></svg>Riprova</button></div>
+  </div></div>
+</section>
+
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+(function () {
+  var device = document.getElementById('device');
+  var scaler = document.getElementById('scaler');
+  var screens = Array.prototype.slice.call(document.querySelectorAll('.screen'));
+  var elenco = document.getElementById('elenco');
+  var info = document.getElementById('infoSchermata');
+  var infoScala = document.getElementById('infoScala');
+  var W = 1280, H = 800;
+
+  // Navigatore costruito dalle schermate
+  var gruppi = {};
+  screens.forEach(function (s) {
+    var g = s.dataset.gruppo;
+    if (!gruppi[g]) {
+      var h = document.createElement('h2'); h.textContent = g; elenco.appendChild(h);
+      gruppi[g] = document.createElement('ul'); elenco.appendChild(gruppi[g]);
+    }
+    var li = document.createElement('li');
+    var b = document.createElement('button');
+    b.textContent = s.dataset.nome; b.dataset.target = s.dataset.id;
+    b.addEventListener('click', function () { vai(s.dataset.id); });
+    li.appendChild(b); gruppi[g].appendChild(li);
+  });
+
+  function vai(id) {
+    var trovato = false;
+    screens.forEach(function (s) { var on = s.dataset.id === id; s.classList.toggle('on', on); if (on) { trovato = true; info.textContent = s.dataset.gruppo + ' — ' + s.dataset.nome; } });
+    if (!trovato) return vai('home');
+    elenco.querySelectorAll('button').forEach(function (b) { b.setAttribute('aria-current', b.dataset.target === id ? 'true' : 'false'); });
+    try { history.replaceState(null, '', '#' + id); } catch (e) {}
+  }
+
+  device.addEventListener('click', function (e) {
+    var t = e.target.closest('[data-vai]');
+    if (t) { vai(t.dataset.vai); return; }
+    if (e.target.closest('[data-ap]')) {
+      var ordine = ['100', '125', '150'];
+      var i = (ordine.indexOf(device.dataset.scala) + 1) % 3;
+      device.dataset.scala = ordine[i];
+      document.querySelectorAll('[data-ap]').forEach(function (b) { b.lastChild.textContent = 'A+ ' + ordine[i] + '%'; });
+    }
+  });
+
+  // Pressione lunga di 2 s sul logo (dito o mouse), senza indicazioni visibili all'operatore
+  var timer = null;
+  device.addEventListener('pointerdown', function (e) {
+    var l = e.target.closest('[data-logo]'); if (!l) return;
+    l.classList.add('premuto');
+    timer = setTimeout(function () { l.classList.remove('premuto'); vai('pin'); }, 2000);
+  });
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach(function (ev) {
+    device.addEventListener(ev, function () { clearTimeout(timer); device.querySelectorAll('.premuto').forEach(function (l) { l.classList.remove('premuto'); }); }, true);
+  });
+
+  // Risoluzione e scala della cornice
+  function adatta() {
+    device.style.width = W + 'px'; device.style.height = H + 'px';
+    var disp = scaler.parentElement.clientWidth - 20;
+    var alt = Math.max(320, window.innerHeight - 90);
+    var s = Math.min(1, disp / W, window.innerWidth > 900 ? alt / H : 1);
+    device.style.transform = 'translate(10px,10px) scale(' + s + ')';
+    scaler.style.height = (H * s + 20) + 'px';
+    infoScala.textContent = W + '×' + H + ' · scala ' + Math.round(s * 100) + '%';
+  }
+  document.getElementById('ris').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    W = +b.dataset.w; H = +b.dataset.h;
+    this.querySelectorAll('button').forEach(function (x) { x.setAttribute('aria-current', x === b ? 'true' : 'false'); });
+    adatta();
+  });
+  document.getElementById('btnAnn').addEventListener('click', function () {
+    var on = device.classList.toggle('mostra-ann');
+    this.setAttribute('aria-pressed', on ? 'true' : 'false');
+    this.textContent = on ? "Note visibili" : "Note nascoste";
+  });
+  window.addEventListener('resize', adatta);
+
+  var h = (location.hash || '').replace('#', '');
+  vai(h || 'home');
+  adatta();
+})();
+</script>
+</body>
+</html>

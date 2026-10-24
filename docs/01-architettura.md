@@ -1,0 +1,93 @@
+# 1. Architettura e scelte motivate
+
+```
+ Share SMB (Windows)                 Server Docker (un container)                         Totem
+ ─────────────────────               ───────────────────────────────────────────          ──────────────────────────
+ \\srv\sds        ──┐                ┌─────────────────────────────────────────┐          Chromium --kiosk (Fase A)
+ \\srv\prodotti   ──┼─ SMB 2.1/3.x ─▶│ Scanner (polling)                       │          Fully Kiosk (Fase B)
+ \\srv\emergenza  ──┘  sola lettura  │  ├ stabilità 2 scansioni                │          ┌────────────────────────┐
+                       go-smb2       │  ├ verifica %PDF … %%EOF                │  HTTPS   │ PWA Preact             │
+                                     │  ├ SHA-256 (cache size+mtime)           │◀────────▶│  Service worker        │
+                                     │  └ copia in /data/blobs/<sha256>        │  NPM     │   (solo shell app)     │
+                                     │ Publisher                               │  (LE DNS)│  Sync PDF scritta a    │
+                                     │  ├ manifest.json (tmp+rename)           │          │   mano → Cache Storage │
+                                     │  └ GC blob non referenziati             │          │  Indice → IndexedDB    │
+                                     │ HTTP :8080                              │          │  MiniSearch, pdf.js    │
+                                     │  ├ /            PWA (go:embed)          │          └────────────────────────┘
+                                     │  ├ /manifest.json, /api/files/<sha>     │
+                                     │  ├ /api/heartbeat, /api/status          │
+                                     │  └ /api/maint/*  (PIN → token 10 min)   │
+                                     │ 127.0.0.1:8081 interno                  │◀── docker compose exec totem /totem reset-pairing
+                                     │  └ healthcheck, reset-pairing           │◀── HEALTHCHECK /totem healthcheck
+                                     └──── /data (config.json, blobs, log) ────┘
+                                           /secrets (key AES-GCM)
+```
+
+## Flusso dei dati
+
+1. **Scansione** (ogni 2 min di default). Per ogni sezione lo scanner elenca i PDF della
+   share. Un file entra solo dopo due scansioni consecutive con dimensione e data di
+   modifica invariate. Lo SHA-256 si ricalcola solo se cambiano dimensione o data di
+   modifica. Il file si legge **una sola volta**: mentre lo si copia nel blob temporaneo
+   se ne calcola l'hash e si controllano intestazione `%PDF` e marcatore `%%EOF`.
+   Se il controllo fallisce si tiene la versione precedente e si registra l'errore.
+2. **Pubblicazione.** Se l'insieme dei documenti è cambiato, il server scrive un nuovo
+   `manifest.json` (file temporaneo e poi rename) e incrementa `version`. Solo dopo
+   elimina i blob che non sono più referenziati né dal nuovo manifest né dal precedente.
+   Il precedente resta in vita per un ciclo, così un totem che sta scaricando con il
+   vecchio manifest non resta a metà.
+3. **Sync del totem** (ogni 5 min, all'evento `online` e con "Aggiorna ora"). La PWA
+   scarica il manifest e lo confronta con l'indice locale. Scarica nella Cache Storage
+   solo i PDF nuovi o cambiati, verifica lo SHA-256 e poi aggiorna l'indice in
+   IndexedDB con un'unica transazione. Solo dopo elimina i PDF che non servono più.
+4. **Lettura.** Avviene solo dalla Cache Storage, quindi è indipendente da rete e server.
+
+## Scelte motivate
+
+| Scelta | Motivo |
+|---|---|
+| Go + go-smb2 nello stesso processo | SMB in user space: niente mount CIFS, niente `CAP_SYS_ADMIN`, niente kernel. Il binario statico sta su distroless/static. |
+| Archivio per hash `/data/blobs/<sha256>` | Il server serve i PDF anche con la share spenta. La deduplicazione è gratuita, l'ETag è lo SHA, il cambio di versione è atomico perché cambia solo il riferimento nel manifest. |
+| Polling invece di watcher | Le notifiche SMB (change notify) sono fragili su share Windows e si perdono alle disconnessioni. Il polling è prevedibile e la cache degli hash lo rende economico. |
+| Stabilità su due scansioni | Copre i PDF in fase di scrittura (salvataggio da Office, copia lenta) senza lock né euristiche sui nomi. Quando ci sono file in attesa, la scansione successiva parte dopo 20 s e non dopo l'intervallo pieno. |
+| Manifest unico, versionato, con hash complessivo | Il totem capisce con una sola richiesta se c'è qualcosa da fare. L'hash complessivo copre documenti e sezioni, non lo stato delle scansioni, che passa da `/api/status`. |
+| Sync PDF scritta a mano, Workbox solo per la shell | Workbox non sa fare sostituzioni atomiche con verifica SHA-256 né stime di spazio. Le tiene a parte: aggiornare l'app non tocca i documenti e viceversa. |
+| Cache Storage per i PDF, IndexedDB per l'indice | Cache Storage conserva i `Response` binari in modo efficiente ed è leggibile anche dal service worker. IndexedDB permette la transazione atomica sull'indice (il "commit" della sync). |
+| Indice locale come unica fonte di verità | Un PDF è visibile solo se il suo SHA è nell'indice **e** il blob è nella cache. L'indice si aggiorna solo a download completati, quindi nessun documento resta a metà e nessuna sezione si svuota per una sync fallita. |
+| Token di dispositivo in cookie HttpOnly | Non leggibile da JS, viaggia da solo anche nelle richieste di pdf.js e del service worker. In config si salva solo il suo SHA-256: il token ha 256 bit casuali, quindi non serve un hash lento. |
+| PIN con argon2id lato server, token di manutenzione in memoria JS | Un ricaricamento della pagina chiude la manutenzione, così nessuno stato privilegiato sopravvive. Il blocco dopo 5 errori è lato server e resiste anche a un attacco da un altro client in LAN. |
+| Codice di setup monouso nei log | Chi è in rete ma non ha accesso al server Docker non può impossessarsi del totem prima della messa in servizio. |
+| Listener interno 127.0.0.1:8081 | `reset-pairing` e `healthcheck` girano con `docker compose exec` nello stesso namespace di rete. Il listener non è esposto all'esterno e non serve un secondo canale di autenticazione. Se il server non è in esecuzione, il comando modifica direttamente i file. |
+| AES-GCM con chiave in `/secrets/key` | Le password SMB non stanno mai in chiaro su disco, nei log o nella PWA. La chiave è separata dai dati, quindi un backup di `/data` da solo non espone le password. |
+| config.json, nessun database | Le sezioni sono una manciata. Un file JSON con backup automatico prima delle migrazioni si legge, si salva e si ripristina senza strumenti. |
+| HTTP :8080 dietro NPM | Il certificato e l'access list LAN restano nel proxy che esiste già. Il container non gestisce certificati. |
+| Aggiornamenti PWA solo di notte e in inattività | Il service worker nuovo resta in `waiting` e si attiva con `skipWaiting` solo nella finestra notturna dopo X minuti senza interazioni. Una lettura in corso non viene mai interrotta. |
+| Fase 2 già nel modello | Un dispositivo ha `ruolo` (`totem`/`telefono`). Le API di abbinamento e revoca esistono, ma rispondono 404 finché `globali.fase2` è `false`. |
+
+## Nomi di file da tenere distinti
+
+- `/manifest.json`: il manifest **dei documenti**, protetto dal token di dispositivo, come
+  richiesto dalla specifica.
+- `/app.webmanifest`: il web app manifest della PWA, pubblico.
+
+## Valori di default (nel codice, sovrascrivibili solo da `config.json` → `impostazioni`)
+
+| Chiave | Default | Dove |
+|---|---|---|
+| `intervalloScansione` | `2m` | server |
+| `ritardoStabilita` | `20s` (scansione ravvicinata se ci sono file in attesa) | server |
+| `regexRevisione` | `(?i)[ _-]*(?:rev|r)\.?[ _-]*(\d{1,3})$` | server |
+| `intervalloSync` | `5m` | PWA (ricevuto dal manifest) |
+| `intervalloHeartbeat` | `5m` | PWA |
+| `giorniAvviso` | `3` | PWA |
+| `giorniRecenti` | `30` | PWA |
+| `inattivitaMinuti` | `3` (ritorno alla Home) | PWA |
+| `finestraNotturna` | `02:00-05:00` | PWA |
+| `inattivitaAggiornamentoMinuti` | `15` | PWA |
+| `margineSpazioMB` | `50` | PWA |
+| `maxDimensionePDFMB` | `200` | server |
+| `tentativiPIN` / `bloccoPIN` | `5` / `5m` | server |
+| `scadenzaManutenzione` | `10m` | server |
+
+I valori che servono alla PWA arrivano nel manifest sotto `settings`, così anche
+le impostazioni lato totem si cambiano solo da file sul server.

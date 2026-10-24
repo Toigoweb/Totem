@@ -1,0 +1,21 @@
+# Samba per i test di integrazione:
+#   docker compose -f docker-compose.test.yml up -d
+#   go test -tags integration ./test/integration/...
+#   docker compose -f docker-compose.test.yml down
+services:
+  samba:
+    image: dperson/samba:latest
+    ports: ["1445:445"]
+    volumes:
+      - ./test/integration/share:/share
+    command: >
+      -r
+      -u "totem;Giusta-123"
+      -u "altro;Altra-123"
+      -s "sds;/share/sds;yes;yes;no;totem"
+      -s "cifrata;/share/cifrata;yes;yes;no;totem"
+      -s "riservata;/share/riservata;yes;yes;no;altro"
+      -G "cifrata;smb encrypt = required"
+      -g "server min protocol = SMB2_10"
+      -g "server signing = mandatory"
+      -g "map to guest = never"
