@@ -79,6 +79,15 @@
 - Il logo aziendale si mette in `/data/logo.svg` o `/data/logo.png`; la PWA lo conserva in
   IndexedDB per l'uso offline. Senza logo compare la scritta SICUREZZA.
 
+## Decisioni prese durante lo sviluppo
+
+| Tema | Decisione | Motivo |
+|---|---|---|
+| Dimensione dell'immagine | 24,6 MB (6,4 MB compressi) invece di circa 20 | La differenza sono le risorse di pdf.js. Si tengono le cmaps (1,7 MB): senza, una SDS di un fornitore con caratteri cinesi, giapponesi o coreani non si leggerebbe bene, e sul totem di sicurezza ogni documento deve aprirsi. Tolti invece i fallback non-wasm, QuickJS e i font woff/non latini. |
+| Totem non più abbinato | Pillola gialla "Abbinamento da rifare", documenti sempre leggibili | La specifica prevede quattro stati della pillola; questo quinto caso (dopo `reset-pairing` o cookie cancellato) deve restare distinguibile da "offline", perché si risolve solo con la procedura guidata. |
+| Inattività durante la procedura guidata | Non riporta alla Home | Un tecnico non deve perdere la messa in servizio a metà. |
+| Blocco del PIN | Globale, non per indirizzo IP | In LAN gli indirizzi si cambiano facilmente. |
+
 ## Nomi di file da tenere distinti
 
 - `/manifest.json`: il manifest **dei documenti**, protetto dal token di dispositivo, come

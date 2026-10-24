@@ -77,6 +77,14 @@ con `powercfg`, oppure lo spegnimento programmato del monitor se lo supporta.
 
 Il log del watchdog è in `C:\TotemKiosk\watchdog.log`.
 
+Gli script sono provati a ogni push dalla CI su un Windows vero (job `windows-kiosk`):
+- sintassi e codifica leggibile da Windows PowerShell 5.1;
+- installazione per un utente di prova, con le due attività pianificate;
+- avvio di Chrome con il profilo del totem e riapertura dopo la chiusura.
+
+Restano da provare sul posto Autologon, i criteri di gruppo e il comportamento con uno
+schermo touch.
+
 ### A5. Accesso automatico
 
 - ☐ Scaricare **Sysinternals Autologon** e, da amministratore, eseguire

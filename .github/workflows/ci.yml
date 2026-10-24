@@ -12,8 +12,8 @@ jobs:
   go:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
         with: { go-version-file: go.mod }
       - run: test -z "$(gofmt -l .)"
       - run: go vet ./...
@@ -22,8 +22,8 @@ jobs:
   integration:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
         with: { go-version-file: go.mod }
       - run: chmod -R a+rX test/integration/share
       - run: docker compose -f docker-compose.test.yml up -d --wait || (sleep 10 && docker compose -f docker-compose.test.yml ps)
@@ -35,8 +35,8 @@ jobs:
     runs-on: ubuntu-latest
     defaults: { run: { working-directory: web } }
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with: { node-version: 22, cache: npm, cache-dependency-path: web/package-lock.json }
       - run: npm ci
       - run: npm test --if-present
@@ -45,10 +45,10 @@ jobs:
   e2e:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
         with: { go-version-file: go.mod }
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with: { node-version: 22 }
       - run: npm ci
         working-directory: web
@@ -57,14 +57,14 @@ jobs:
       - run: npx playwright test
         working-directory: test/e2e
       - if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with: { name: e2e-report, path: test/e2e/test-results, retention-days: 7 }
 
   # Script del kiosk Windows (fase A) provati su un Windows vero
   windows-kiosk:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Sintassi degli script PowerShell
         shell: pwsh
@@ -76,6 +76,14 @@ jobs:
             if ($errs) { $errs | ForEach-Object { Write-Host "$($f.Name): $_" }; $fail = $true }
           }
           if ($fail) { exit 1 }
+
+      - name: Codifica leggibile da Windows PowerShell 5.1 (UTF-8 con BOM)
+        shell: powershell
+        run: |
+          foreach ($f in Get-ChildItem deploy/windows/*.ps1) {
+            $t = Get-Content -Raw $f.FullName
+            if ($t -notmatch [string][char]0xE0) { throw "$($f.Name): lettere accentate lette male" }
+          }
 
       - name: Installazione per un utente di prova
         shell: powershell
@@ -108,7 +116,7 @@ jobs:
   image:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: docker/setup-buildx-action@v3
       - uses: docker/build-push-action@v6
         with: { context: ., push: false, build-args: VERSION=ci }

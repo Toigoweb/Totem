@@ -1,4 +1,4 @@
-<#
+﻿<#
   Prepara il PC Windows come totem (fase A). Da eseguire una volta, come amministratore:
 
     powershell -ExecutionPolicy Bypass -File installa-kiosk.ps1 -Url https://totem.azienda.it -Utente totem

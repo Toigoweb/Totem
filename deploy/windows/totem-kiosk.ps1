@@ -1,4 +1,4 @@
-<#
+﻿<#
   Watchdog del kiosk: avvia Chrome in modalità kiosk con un profilo persistente dedicato
   e lo riavvia se si chiude. Gira nella sessione dell'utente del totem (attività
   pianificata "all'accesso", creata da installa-kiosk.ps1).
