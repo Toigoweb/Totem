@@ -128,6 +128,11 @@ Configurazione computer → Modelli amministrativi (questi valgono per tutto il 
 2. ☐ Passo 1: codice di setup. Passo 2: nuovo PIN e conferma. Passo 3: prima sezione con
    "Prova connessione" riuscita. Passo 4: prima sincronizzazione. La Home si apre da
    sola; le altre sezioni si aggiungono da **Area manutenzione**.
+   - ☐ Sezioni **OneDrive / SharePoint**: app registrata con consenso amministratore
+     (README 2.1), scadenza del segreto annotata nella scheda del totem, uscita HTTPS del
+     server verso `login.microsoftonline.com` e `graph.microsoft.com`.
+   - ☐ Sezioni a **caricamento diretto**: PDF caricati con "Carica PDF", cartella
+     `/opt/totem/data/uploads/` inclusa nel backup.
 3. ☐ **Prove funzionali:**
    - aprire una SDS e premere PRIMO SOCCORSO;
    - cercare un prodotto;

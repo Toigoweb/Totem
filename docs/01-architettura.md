@@ -66,6 +66,7 @@
 | Più totem e reparti | Il manifest è una vista per dispositivo costruita a ogni richiesta: le share si leggono una volta sola, ogni totem scarica solo le sezioni del suo reparto. I reparti decidono cosa mostrare, non sono un confine di sicurezza. |
 | Numeri utili, avvisi, salvaschermo nel manifest | Arrivano con la sync e restano in IndexedDB: funzionano offline; le date degli avvisi le controlla il totem. |
 | Pagina di monitoraggio | Token dedicato (solo hash in config), HTTP 503 in caso di errore: si integra con qualsiasi strumento senza plugin. |
+| Origini OneDrive, WebDAV, caricamento diretto | Stessa interfaccia `Source` (List/Open) della share SMB: scanner, stabilità, validazione e archivio non cambiano. OneDrive con Graph e flusso client credentials (nessun utente, nessun MFA, token in memoria); il link della cartella si risolve con `/shares`. I caricamenti finiscono in `/data/uploads/<sezione>` e lo scanner li tratta come una cartella locale. |
 | Fase 2 già nel modello | Un dispositivo ha `ruolo` (`totem`/`telefono`). Le API di abbinamento e revoca esistono, ma rispondono 404 finché `globali.fase2` è `false`. |
 
 ## Interfaccia e kiosk

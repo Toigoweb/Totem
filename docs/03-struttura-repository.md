@@ -6,6 +6,9 @@
 ├── internal/
 │   ├── config/                  config.json: load, migrazioni con backup, salvataggio atomico, AES-GCM
 │   ├── smbsrc/                  sorgente SMB (go-smb2): parsing UNC, elenco PDF, apertura, classificazione errori
+│   ├── davsrc/                  sorgente WebDAV (PROPFIND, Basic auth)
+│   ├── graphsrc/                sorgente OneDrive/SharePoint (Microsoft Graph, client credentials)
+│   ├── sources/                 scelta della sorgente per tipo; cartella dei caricamenti diretti
 │   ├── scanner/                 scansione, stabilità, validazione PDF, blob store, manifest, GC
 │   ├── auth/                    PIN argon2id, blocco tentativi, codice di setup, token dispositivo e manutenzione
 │   ├── api/                     handler HTTP pubblici, dispositivo, manutenzione, listener interno

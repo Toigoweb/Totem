@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { pillState, recentDocs, activeNotices } from './app.js';
 import { screensaverMode } from './kiosk/Screensaver.jsx';
 import { inWindow, shouldApply } from './kiosk/updates.js';
-import { validPath, validUser } from './screens/SectionForm.jsx';
+import { validPath, validUser, checkSource } from './screens/SectionForm.jsx';
+import { validFolder } from './screens/Uploads.jsx';
 import { buildIndex } from './screens/Search.jsx';
 
 const base = { sync: { running: false, progress: null, lastError: null }, deviceError: false, settings: { staleDays: 3 }, meta: { lastSuccess: null, lastError: null } };
@@ -100,5 +101,32 @@ describe('avvisi e salvaschermo', () => {
     const off = { ...base, extras: { screensaver: { ...base.extras.screensaver, enabled: false } } };
     expect(screensaverMode(off, t)).toBe(null);
     expect(screensaverMode(off, new Date('2026-10-24T22:00:00'))).toBe('nero');
+  });
+});
+
+describe('origini dei PDF', () => {
+  const base = { percorso: '', utente: '', tenant: '', password: '' };
+  it('OneDrive: link SharePoint, tenant e client ID', () => {
+    const ok = { ...base, tipo: 'onedrive', percorso: 'https://azienda.sharepoint.com/:f:/s/HSE/Eabc', tenant: 'azienda.onmicrosoft.com', utente: '1b2c3d4e-0000-1111-2222-333344445555' };
+    expect(checkSource(ok).ok).toBe(true);
+    expect(checkSource({ ...ok, percorso: 'https://example.com/x' }).path).toBe(false);
+    expect(checkSource({ ...ok, percorso: 'http://azienda.sharepoint.com/x' }).path).toBe(false);
+    expect(checkSource({ ...ok, tenant: 'azienda' }).tenant).toBe(false);
+    expect(checkSource({ ...ok, utente: 'mario' }).user).toBe(false);
+  });
+  it('WebDAV: http(s) senza credenziali nell\'URL', () => {
+    expect(checkSource({ ...base, tipo: 'webdav', percorso: 'https://cloud.azienda.it/remote.php/dav/files/totem/SDS' }).ok).toBe(true);
+    expect(checkSource({ ...base, tipo: 'webdav', percorso: 'https://u:p@cloud.azienda.it/dav' }).ok).toBe(false);
+    expect(checkSource({ ...base, tipo: 'webdav', percorso: 'ftp://nas/dav' }).ok).toBe(false);
+  });
+  it('caricamento diretto: niente da controllare; sottocartella semplice', () => {
+    expect(checkSource({ ...base, tipo: 'upload' }).ok).toBe(true);
+    expect(validFolder('Edificio A')).toBe(true);
+    expect(validFolder('a/b')).toBe(false);
+    expect(validFolder('.x')).toBe(false);
+    expect(validFolder('x'.repeat(41))).toBe(false);
+  });
+  it('SMB invariato', () => {
+    expect(checkSource({ ...base, tipo: 'smb', percorso: '\\\\srv\\sds', utente: 'AZ\\totem' }).ok).toBe(true);
   });
 });

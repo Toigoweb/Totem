@@ -37,9 +37,13 @@ type Source interface {
 // Target sono i parametri di connessione di una sezione, con password in chiaro
 // (solo in memoria, mai su disco o nei log).
 type Target struct {
-	Path      string // \\server\condivisione[\cartella...]
-	User      string // DOMINIO\utente, utente@dominio o utente
-	Password  string
+	// Type è il tipo di origine: "smb" (o vuoto), "webdav", "onedrive", "upload".
+	// La connessione per tipo la sceglie il pacchetto sources.
+	Type      string
+	Path      string // SMB: \\server\condivisione[\cartella...]; WebDAV/OneDrive: URL; upload: cartella locale
+	User      string // SMB/WebDAV: utente; OneDrive: client ID
+	Password  string // SMB/WebDAV: password; OneDrive: client secret
+	Tenant    string // solo OneDrive
 	Recursive bool
 	// Port vale 445 se zero. Serve solo ai test di integrazione.
 	Port int
@@ -349,3 +353,24 @@ func SafeRel(rel string) bool {
 	}
 	return true
 }
+
+// HTTPError traduce lo stato HTTP di WebDAV o Microsoft Graph in un codice stabile.
+func HTTPError(status int, what string) error {
+	code := ErrIO
+	switch {
+	case status == 401:
+		code = ErrAuth
+	case status == 403:
+		code = ErrAccessDenied
+	case status == 404 || status == 410:
+		code = ErrNotFound
+	case status == 408 || status == 504:
+		code = ErrTimeout
+	case status == 502 || status == 503:
+		code = ErrUnreachable
+	}
+	return &Error{Code: code, Err: fmt.Errorf("%s: HTTP %d", what, status)}
+}
+
+// Wrap classifica un errore qualsiasi (rete, contesto) mantenendo i codici già assegnati.
+func Wrap(err error) error { return wrap(err) }

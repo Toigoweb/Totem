@@ -15,6 +15,56 @@ export function validPath(p) {
 }
 export const validUser = (u) => u === '' || USER.test(u);
 
+// Altre origini: stesse regole di internal/config
+const GUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+const DOMAIN = /^[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$/;
+function parseURL(u) {
+  try {
+    return new URL(u);
+  } catch {
+    return null;
+  }
+}
+export function validDavURL(u) {
+  const p = parseURL(u);
+  return !!p && (p.protocol === 'https:' || p.protocol === 'http:') && !!p.host && !p.username && !p.password && u.length <= 500;
+}
+export function validOneDriveLink(u) {
+  const p = parseURL(u);
+  if (!p || p.protocol !== 'https:' || p.username || u.length > 1000) return false;
+  const h = p.hostname.toLowerCase();
+  return h.endsWith('.sharepoint.com') || h === 'onedrive.live.com' || h === '1drv.ms' || h.endsWith('.sharepoint.us');
+}
+export const validTenant = (t) => GUID.test(t) || (DOMAIN.test(t) && t.length <= 253);
+export const validClientId = (c) => GUID.test(c);
+
+export const SOURCE_TYPES = ['smb', 'onedrive', 'webdav', 'upload'];
+const SOURCE_ICON = { smb: 'rete', onedrive: 'nuvola', webdav: 'nuvola', upload: 'carica' };
+
+/** Controllo dei campi dell'origine: restituisce { ok, path, user, tenant } (true = valido). */
+export function checkSource(f) {
+  switch (f.tipo) {
+    case 'onedrive': {
+      const path = validOneDriveLink(f.percorso);
+      const user = validClientId(f.utente);
+      const tenant = validTenant(f.tenant);
+      return { ok: path && user && tenant, path, user, tenant };
+    }
+    case 'webdav': {
+      const path = validDavURL(f.percorso);
+      const user = f.utente.length <= 100;
+      return { ok: path && user, path, user, tenant: true };
+    }
+    case 'upload':
+      return { ok: true, path: true, user: true, tenant: true };
+    default: {
+      const path = validPath(f.percorso);
+      const user = validUser(f.utente);
+      return { ok: path && user, path, user, tenant: true };
+    }
+  }
+}
+
 /**
  * Form unico per creare o modificare una sezione (schermata 7 e passo 3 della procedura).
  * section: sezione esistente (dal server) oppure null.
@@ -25,8 +75,10 @@ export function SectionForm({ section, onSaved, onCancel, submitLabel = S.save, 
     nome: section ? section.nome : '',
     icona: section ? section.icona : 'documento',
     emergenza: section ? section.emergenza : false,
+    tipo: (section && section.tipo) || 'smb',
     percorso: section ? section.percorso : '',
     utente: section ? section.utente : '',
+    tenant: (section && section.tenant) || '',
     password: '',
     sottocartelle: section ? section.sottocartelle : true,
   }));
@@ -34,21 +86,29 @@ export function SectionForm({ section, onSaved, onCancel, submitLabel = S.save, 
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState(null);
   const set = (k) => (v) => setF((x) => ({ ...x, [k]: v }));
+  // cambiando tipo i campi dell'origine ripartono vuoti (tranne tornando al tipo salvato)
+  const setTipo = (tipo) => setF((x) => {
+    if (x.tipo === tipo) return x;
+    const back = section && (section.tipo || 'smb') === tipo;
+    return { ...x, tipo, percorso: back ? section.percorso : '', utente: back ? section.utente : '', tenant: back ? section.tenant || '' : '', password: '' };
+  });
 
+  const isUpload = f.tipo === 'upload';
   const nameOk = f.nome.trim().length > 0 && [...f.nome.trim()].length <= 30;
-  const pathOk = validPath(f.percorso);
-  const userOk = validUser(f.utente);
-  const fp = `${f.percorso.toLowerCase()}\u0000${f.utente}\u0000${f.password}\u0000${f.sottocartelle}`;
-  const shareChanged = isNew || f.percorso !== section.percorso || f.utente !== section.utente || f.password !== '';
+  const chk = checkSource(f);
+  const fp = [f.tipo, f.percorso.toLowerCase(), f.utente, f.password, f.tenant.toLowerCase(), f.sottocartelle].join('\u0000');
+  const savedTipo = section ? section.tipo || 'smb' : null;
+  const shareChanged = isNew || f.tipo !== savedTipo || f.percorso !== section.percorso || f.utente !== section.utente ||
+    f.tenant !== (section.tenant || '') || f.password !== '';
   const testedNow = test.status === 'ok' && test.fp === fp;
-  const canSave = !readOnly && !saving && nameOk && pathOk && userOk && (!shareChanged || testedNow);
+  const canSave = !readOnly && !saving && nameOk && chk.ok && (isUpload || !shareChanged || testedNow);
 
   const runTest = async () => {
     setTest({ status: 'testing', fp });
     try {
       const r = await maintApi('/api/maint/test', {
-        method: 'POST', timeoutMs: 60000,
-        body: { sectionId: section ? section.id : '', percorso: f.percorso, utente: f.utente, password: f.password, sottocartelle: f.sottocartelle },
+        method: 'POST', timeoutMs: 90000,
+        body: { sectionId: section ? section.id : '', tipo: f.tipo, percorso: f.percorso, utente: f.utente, tenant: f.tenant, password: f.password, sottocartelle: f.sottocartelle },
       });
       if (r.data.ok) setTest({ status: 'ok', fp, count: r.data.pdfCount, token: r.data.testToken });
       else setTest({ status: 'err', fp, code: r.data.code || 'io' });
@@ -61,14 +121,15 @@ export function SectionForm({ section, onSaved, onCancel, submitLabel = S.save, 
     if (!canSave) return;
     setSaving(true);
     setErr(null);
-    const body = { nome: f.nome.trim(), icona: f.icona, emergenza: f.emergenza, percorso: f.percorso, utente: f.utente,
-      password: f.password, sottocartelle: f.sottocartelle, testToken: testedNow ? test.token : '' };
+    const body = { nome: f.nome.trim(), icona: f.icona, emergenza: f.emergenza, tipo: f.tipo, percorso: isUpload ? '' : f.percorso.trim(),
+      utente: isUpload ? '' : f.utente.trim(), tenant: f.tipo === 'onedrive' ? f.tenant.trim() : '',
+      password: isUpload ? '' : f.password, sottocartelle: isUpload ? true : f.sottocartelle, testToken: testedNow ? test.token : '' };
     try {
       const r = isNew
         ? await maintApi('/api/maint/sections', { method: 'POST', body })
         : await maintApi(`/api/maint/sections/${section.id}`, { method: 'PUT', body });
       if (r.ok) {
-        onSaved(r.data.id);
+        onSaved(r.data.id, f.tipo);
         return;
       }
       if (r.status === 409 && r.data.error === 'test_required') setErr(S.testNeeded);
@@ -79,6 +140,19 @@ export function SectionForm({ section, onSaved, onCancel, submitLabel = S.save, 
     }
     setSaving(false);
   };
+
+  const errText = (code) => (f.tipo === 'onedrive' && S.testErrOnedrive[code]) || (f.tipo === 'webdav' && S.testErrWebdav[code]) || S.testErr[code] || S.testErr.io;
+  const fieldMsg = (val, ok, help, bad, okMsg) => (!val ? <span class="aiuto">{help}</span>
+    : ok ? (okMsg ? <span class="msg-ok"><Icon name="spunta" />{okMsg}</span> : <span class="aiuto">{help}</span>)
+    : <span class="msg-err" data-testid="path-err"><Icon name="errore" />{bad}</span>);
+  const secretField = (label) => (
+    <div class="campo">
+      <label for="f-password">{label}</label>
+      <input id="f-password" class="input" type="password" value={f.password} autocomplete="new-password"
+        placeholder={!isNew && f.tipo === savedTipo ? S.fPasswordKeep : ''} onInput={(e) => set('password')(e.currentTarget.value)} />
+      {!isNew && f.tipo === savedTipo && <span class="aiuto">{S.fPasswordKeep}</span>}
+    </div>
+  );
 
   return (
     <div class={readOnly ? 'disattivo' : ''}>
@@ -106,32 +180,78 @@ export function SectionForm({ section, onSaved, onCancel, submitLabel = S.save, 
           </div>
         </div>
         <div class="campo largo">
-          <label for="f-percorso">{S.fPath}</label>
-          <input id="f-percorso" class={`input mono ${f.percorso && !pathOk ? 'err' : ''}`} value={f.percorso} placeholder="\\server\condivisione\cartella"
-            onInput={(e) => set('percorso')(e.currentTarget.value)} autocomplete="off" spellcheck={false} />
-          {!f.percorso ? <span class="aiuto">{S.fPathHelp}</span>
-            : pathOk ? <span class="msg-ok"><Icon name="spunta" />{S.fPathOk}</span>
-            : <span class="msg-err" data-testid="path-err"><Icon name="errore" />{S.fPathErr}</span>}
+          <span class="lab">{S.fSource}</span>
+          <div class="chips" role="group" aria-label={S.fSource} data-testid="source-type">
+            {SOURCE_TYPES.map((t) => (
+              <button key={t} type="button" class="chip" aria-pressed={f.tipo === t ? 'true' : 'false'} data-tipo={t} onClick={() => setTipo(t)}>
+                <Icon name={SOURCE_ICON[t]} />{S.sources[t]}
+              </button>
+            ))}
+          </div>
+          <span class="aiuto">{S.sourcesHelp[f.tipo]}</span>
         </div>
-        <div class="campo">
-          <label for="f-utente">{S.fUser}</label>
-          <input id="f-utente" class={`input mono ${!userOk ? 'err' : ''}`} value={f.utente} placeholder="DOMINIO\utente"
-            onInput={(e) => set('utente')(e.currentTarget.value)} autocomplete="off" spellcheck={false} />
-          {userOk ? <span class="aiuto">{S.fUserHelp}</span> : <span class="msg-err"><Icon name="errore" />{S.fUserErr}</span>}
-        </div>
-        <div class="campo">
-          <label for="f-password">{S.fPassword}</label>
-          <input id="f-password" class="input" type="password" value={f.password} autocomplete="new-password"
-            placeholder={isNew ? '' : S.fPasswordKeep} onInput={(e) => set('password')(e.currentTarget.value)} />
-          {!isNew && <span class="aiuto">{S.fPasswordKeep}</span>}
-        </div>
-        <div class="campo">
-          <span class="lab">{S.fSubfolders}</span>
-          <Toggle on={f.sottocartelle} onChange={set('sottocartelle')} id="f-sottocartelle" />
-        </div>
-        <div class="campo largo">
+        {f.tipo === 'smb' && <>
+          <div class="campo largo">
+            <label for="f-percorso">{S.fPath}</label>
+            <input id="f-percorso" class={`input mono ${f.percorso && !chk.path ? 'err' : ''}`} value={f.percorso} placeholder="\\server\condivisione\cartella"
+              onInput={(e) => set('percorso')(e.currentTarget.value)} autocomplete="off" spellcheck={false} />
+            {fieldMsg(f.percorso, chk.path, S.fPathHelp, S.fPathErr, S.fPathOk)}
+          </div>
+          <div class="campo">
+            <label for="f-utente">{S.fUser}</label>
+            <input id="f-utente" class={`input mono ${!chk.user ? 'err' : ''}`} value={f.utente} placeholder="DOMINIO\utente"
+              onInput={(e) => set('utente')(e.currentTarget.value)} autocomplete="off" spellcheck={false} />
+            {chk.user ? <span class="aiuto">{S.fUserHelp}</span> : <span class="msg-err"><Icon name="errore" />{S.fUserErr}</span>}
+          </div>
+          {secretField(S.fPassword)}
+        </>}
+        {f.tipo === 'onedrive' && <>
+          <div class="campo largo">
+            <label for="f-percorso">{S.fOdLink}</label>
+            <input id="f-percorso" class={`input mono ${f.percorso && !chk.path ? 'err' : ''}`} value={f.percorso} placeholder="https://azienda.sharepoint.com/:f:/s/…"
+              onInput={(e) => set('percorso')(e.currentTarget.value)} autocomplete="off" spellcheck={false} />
+            {fieldMsg(f.percorso, chk.path, S.fOdLinkHelp, S.fOdLinkErr)}
+          </div>
+          <div class="campo">
+            <label for="f-tenant">{S.fTenant}</label>
+            <input id="f-tenant" class={`input mono ${f.tenant && !chk.tenant ? 'err' : ''}`} value={f.tenant} placeholder="azienda.onmicrosoft.com"
+              onInput={(e) => set('tenant')(e.currentTarget.value)} autocomplete="off" spellcheck={false} />
+            {fieldMsg(f.tenant, chk.tenant, S.fTenantHelp, S.fTenantErr)}
+          </div>
+          <div class="campo">
+            <label for="f-utente">{S.fClientId}</label>
+            <input id="f-utente" class={`input mono ${f.utente && !chk.user ? 'err' : ''}`} value={f.utente} placeholder="00000000-0000-0000-0000-000000000000"
+              onInput={(e) => set('utente')(e.currentTarget.value)} autocomplete="off" spellcheck={false} />
+            {f.utente && !chk.user && <span class="msg-err"><Icon name="errore" />{S.fClientIdErr}</span>}
+          </div>
+          {secretField(S.fSecret)}
+        </>}
+        {f.tipo === 'webdav' && <>
+          <div class="campo largo">
+            <label for="f-percorso">{S.fDavUrl}</label>
+            <input id="f-percorso" class={`input mono ${f.percorso && !chk.path ? 'err' : ''}`} value={f.percorso} placeholder="https://cloud.azienda.it/remote.php/dav/files/totem/SDS"
+              onInput={(e) => set('percorso')(e.currentTarget.value)} autocomplete="off" spellcheck={false} />
+            {fieldMsg(f.percorso, chk.path, S.fDavUrlHelp, S.fDavUrlErr)}
+          </div>
+          <div class="campo">
+            <label for="f-utente">{S.fUser}</label>
+            <input id="f-utente" class="input mono" value={f.utente} maxLength={100}
+              onInput={(e) => set('utente')(e.currentTarget.value)} autocomplete="off" spellcheck={false} />
+            <span class="aiuto">{S.fDavUserHelp}</span>
+          </div>
+          {secretField(S.fPassword)}
+        </>}
+        {!isUpload && (
+          <div class="campo">
+            <span class="lab">{S.fSubfolders}</span>
+            <Toggle on={f.sottocartelle} onChange={set('sottocartelle')} id="f-sottocartelle" />
+          </div>
+        )}
+        {isUpload ? (
+          <div class="campo largo"><div class="banner info" data-testid="upload-info"><Icon name="info" /><div>{S.uploadAfterSave}</div></div></div>
+        ) : <div class="campo largo">
           <div class="azioni">
-            <button type="button" class="btn" data-testid="test-conn" disabled={!pathOk || !userOk || test.status === 'testing' || readOnly} onClick={runTest}>
+            <button type="button" class="btn" data-testid="test-conn" disabled={!chk.ok || test.status === 'testing' || readOnly} onClick={runTest}>
               <Icon name="sync" />{S.testConn}
             </button>
             {test.status === 'testing' && <span class="esito-prova" role="status"><span class="spinner" />{S.testing}</span>}
@@ -139,11 +259,11 @@ export function SectionForm({ section, onSaved, onCancel, submitLabel = S.save, 
             {test.status === 'err' && test.fp === fp && (
               <span class="esito-prova ko" role="status" data-testid="test-err">
                 <Icon name={{ auth: 'lucchetto', not_found: 'cartella', unreachable: 'nuvolaOff', timeout: 'orologio', network: 'nuvolaOff' }[test.code] || 'errore'} />
-                {S.testErr[test.code] || S.testErr.io}
+                {errText(test.code)}
               </span>
             )}
           </div>
-        </div>
+        </div>}
       </div>
       {err && <div class="banner rosso" style={{ marginTop: '16px' }}><Icon name="errore" /><div>{err}</div></div>}
       <div class="azioni" style={{ marginTop: '20px' }}>

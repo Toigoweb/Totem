@@ -21,6 +21,7 @@ import (
 	"github.com/toigoweb/totem/internal/config"
 	"github.com/toigoweb/totem/internal/scanner"
 	"github.com/toigoweb/totem/internal/smbsrc"
+	"github.com/toigoweb/totem/internal/sources"
 	"github.com/toigoweb/totem/internal/synclog"
 )
 
@@ -59,6 +60,9 @@ func newHarness(t *testing.T) *harness {
 	h.sc, err = scanner.New(scanner.Options{
 		DataDir: h.data, Config: h.cfg, Cipher: h.ci, Settings: config.DefaultSettings(), Log: sl, Logger: lg, Now: h.clk.Now,
 		Connect: func(ctx context.Context, t smbsrc.Target) (smbsrc.Source, error) {
+			if t.Type != config.SourceSMB {
+				return sources.Connect(ctx, t)
+			}
 			if t.Path != `\\srv\sds` && !strings.HasPrefix(t.Path, `\\srv\sds\`) {
 				return nil, &smbsrc.Error{Code: smbsrc.ErrNotFound, Err: errors.New("bad network name")}
 			}

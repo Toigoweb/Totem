@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -42,11 +43,36 @@ type Section struct {
 	Share     Share  `json:"share"`
 }
 
+// Share è l'origine dei PDF di una sezione. Tipo:
+//
+//	"smb" (o vuoto)  Percorso = \\server\condivisione\cartella, Utente = DOMINIO\utente
+//	"webdav"         Percorso = URL della cartella (Nextcloud, Synology…), Utente e Password
+//	"onedrive"       Percorso = link della cartella OneDrive/SharePoint, Tenant = id o dominio
+//	                 del tenant, Utente = client ID dell'app, Password = client secret
+//	"upload"         PDF caricati dall'area manutenzione in /data/uploads/<id sezione>
 type Share struct {
+	Tipo          string `json:"tipo,omitempty"`
 	Percorso      string `json:"percorso"`
 	Utente        string `json:"utente"`
 	Password      string `json:"password"` // cifrata: "v1:..." (vedi crypto.go)
+	Tenant        string `json:"tenant,omitempty"`
 	Sottocartelle bool   `json:"sottocartelle"`
+}
+
+// Tipi di origine.
+const (
+	SourceSMB      = "smb"
+	SourceWebDAV   = "webdav"
+	SourceOneDrive = "onedrive"
+	SourceUpload   = "upload"
+)
+
+// Kind restituisce il tipo di origine, "smb" se non indicato.
+func (s Share) Kind() string {
+	if s.Tipo == "" {
+		return SourceSMB
+	}
+	return s.Tipo
 }
 
 type Globals struct {
@@ -211,13 +237,63 @@ func ValidateSection(s Section) error {
 	if !validIcon(s.Icona) {
 		return &ValidationError{"icona", "icona non ammessa"}
 	}
-	if !ValidSharePath(s.Share.Percorso) {
-		return &ValidationError{"percorso", "formato non valido"}
-	}
-	if s.Share.Utente != "" && !ValidUser(s.Share.Utente) {
-		return &ValidationError{"utente", "formato non valido"}
+	switch s.Share.Kind() {
+	case SourceSMB:
+		if !ValidSharePath(s.Share.Percorso) {
+			return &ValidationError{"percorso", "formato non valido"}
+		}
+		if s.Share.Utente != "" && !ValidUser(s.Share.Utente) {
+			return &ValidationError{"utente", "formato non valido"}
+		}
+	case SourceWebDAV:
+		if !ValidWebDAVURL(s.Share.Percorso) {
+			return &ValidationError{"percorso", "URL non valido"}
+		}
+		if len(s.Share.Utente) > 100 {
+			return &ValidationError{"utente", "troppo lungo"}
+		}
+	case SourceOneDrive:
+		if !ValidOneDriveLink(s.Share.Percorso) {
+			return &ValidationError{"percorso", "link non valido"}
+		}
+		if !ValidTenant(s.Share.Tenant) {
+			return &ValidationError{"tenant", "tenant non valido"}
+		}
+		if !guidRe.MatchString(s.Share.Utente) {
+			return &ValidationError{"utente", "client ID non valido"}
+		}
+	case SourceUpload:
+		// nessun percorso: i file stanno in /data/uploads/<id>
+	default:
+		return &ValidationError{"tipo", "tipo di origine sconosciuto"}
 	}
 	return nil
+}
+
+var (
+	guidRe   = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
+	domainRe = regexp.MustCompile(`^[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$`)
+)
+
+// ValidWebDAVURL: http(s) con host, senza credenziali nell'URL.
+func ValidWebDAVURL(u string) bool {
+	p, err := url.Parse(u)
+	return err == nil && (p.Scheme == "https" || p.Scheme == "http") && p.Host != "" && p.User == nil && len(u) <= 500
+}
+
+// ValidOneDriveLink: link https di OneDrive o SharePoint (quello di "Copia collegamento").
+func ValidOneDriveLink(u string) bool {
+	p, err := url.Parse(u)
+	if err != nil || p.Scheme != "https" || p.User != nil || len(u) > 1000 {
+		return false
+	}
+	h := strings.ToLower(p.Hostname())
+	return strings.HasSuffix(h, ".sharepoint.com") || h == "onedrive.live.com" || h == "1drv.ms" || strings.HasSuffix(h, ".sharepoint.us")
+}
+
+// ValidTenant: GUID del tenant o dominio (azienda.onmicrosoft.com, azienda.it).
+func ValidTenant(t string) bool {
+	return guidRe.MatchString(t) || (domainRe.MatchString(t) && len(t) <= 253)
 }
 
 // ---------------------------------------------------------------------------

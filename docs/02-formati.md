@@ -134,9 +134,11 @@ Le chiavi sono in italiano perché è l'unico file pensato per essere letto da u
 |---|---|
 | `sezioni[].icona` | Una tra: `documento`, `flacone`, `scudo`, `fiamma`, `croce`, `casco`, `uscita`, `mappa`, `ingranaggio`, `cartella`. |
 | `sezioni[].nome` | Obbligatorio, 1-30 caratteri. |
-| `share.percorso` | `\\server\condivisione[\cartella…]`. Nessun `..`, nessun carattere di controllo. |
-| `share.utente` | `DOMINIO\utente`, `utente@dominio` oppure `utente`. |
-| `share.password` | `v1:` + base64(nonce 12 byte ‖ ciphertext AES-256-GCM). Associated data = id della sezione. |
+| `share.tipo` | `smb` (predefinito se assente), `onedrive`, `webdav`, `upload`. |
+| `share.percorso` | SMB: `\\server\condivisione[\cartella…]`, nessun `..` né caratteri di controllo. OneDrive: link https `*.sharepoint.com`, `onedrive.live.com` o `1drv.ms`. WebDAV: URL http(s) senza credenziali. Upload: vuoto (i file stanno in `/data/uploads/<id>`). |
+| `share.utente` | SMB: `DOMINIO\utente`, `utente@dominio` oppure `utente`. WebDAV: utente. OneDrive: ID applicazione (GUID). |
+| `share.tenant` | Solo OneDrive: ID (GUID) o dominio del tenant Microsoft 365. |
+| `share.password` | Password SMB/WebDAV o segreto client OneDrive: `v1:` + base64(nonce 12 byte ‖ ciphertext AES-256-GCM). Associated data = id della sezione. |
 | `globali.dispositivi[].ruolo` | `totem` (uno solo), `postazione` (altri PC con accesso alla manutenzione) o `telefono` (fase 2). |
 | `globali.dispositivi[].tokenHash` | SHA-256 esadecimale del token del cookie `totem_device`. |
 | `globali.dispositivi[].ultimoContatto` | Aggiornato dall'heartbeat, al massimo una volta al minuto. |

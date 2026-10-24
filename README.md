@@ -118,6 +118,17 @@ l'uso offline. Senza logo compare la scritta SICUREZZA.
 
 ## 2. Gestione dei PDF sulle share (per chi mantiene i documenti)
 
+Ogni sezione prende i PDF da una di quattro origini, scelta nel form della sezione
+("Da dove arrivano i PDF"). Le regole qui sotto valgono per tutte: il totem riceve i
+documenti sempre e solo dal server, e li conserva offline allo stesso modo.
+
+| Origine | Quando usarla | Cosa serve |
+|---|---|---|
+| Cartella di rete (SMB) | File server o NAS aziendale | `\\server\condivisione\cartella`, utente e password in sola lettura |
+| OneDrive / SharePoint | Documenti già gestiti in Microsoft 365 | Link della cartella, app registrata in Entra ID (vedi 2.1) |
+| WebDAV | Nextcloud, ownCloud, Synology, QNAP… | URL WebDAV della cartella, utente e password |
+| Caricamento diretto | Nessuna cartella condivisa disponibile, pochi documenti | Niente: i PDF si caricano dall'area manutenzione (vedi 2.3) |
+
 - Basta copiare, sostituire o cancellare i PDF nelle cartelle: il server se ne accorge
   entro 2 minuti e il totem si aggiorna entro i 5 minuti successivi.
 - **Revisione nel nome:** `Acetone_rev3.pdf`, `Acetone Rev. 3.pdf`, `Acetone-R03.pdf` e
@@ -133,6 +144,57 @@ l'uso offline. Senza logo compare la scritta SICUREZZA.
 - **SDS:** il totem riconosce le 16 sezioni standard se il testo del PDF contiene le
   intestazioni "SEZIONE n" o "SECTION n" a inizio riga. Le SDS scansionate come
   immagine non hanno testo: si leggono normalmente, ma senza accesso rapido.
+
+### 2.1 OneDrive / SharePoint
+
+Il server legge la cartella con Microsoft Graph, in sola lettura, a nome di un'app
+registrata nel tenant (non di un utente: nessuna password personale, nessun MFA).
+Una volta sola, un amministratore Microsoft 365:
+
+1. [Entra ID](https://entra.microsoft.com) → **Registrazioni app** → **Nuova
+   registrazione**, nome "Totem documenti di sicurezza", account solo di questa
+   organizzazione. Annotare **ID applicazione (client)** e **ID directory (tenant)**.
+2. **Certificati e segreti** → **Nuovo segreto client**. Annotare il **valore** (si vede
+   una volta sola) e la scadenza: alla scadenza il totem mostra "Credenziali dell'app non
+   valide" e il segreto va rinnovato e reinserito nella sezione.
+3. **Autorizzazioni API** → **Aggiungi** → Microsoft Graph → **Autorizzazioni
+   applicazione** → `Files.Read.All` (OneDrive e SharePoint) oppure `Sites.Read.All`
+   (solo SharePoint). Poi **Concedi consenso amministratore**.
+   Per limitare l'app a un solo sito SharePoint si può usare `Sites.Selected` e concedere
+   la lettura del sito all'app (procedura Microsoft "Sites.Selected").
+4. In OneDrive o SharePoint, clic destro sulla cartella → **Copia collegamento**.
+
+Nel form della sezione: tipo "OneDrive / SharePoint", il link copiato, il tenant (ID o
+dominio, es. `azienda.onmicrosoft.com`), l'ID applicazione e il segreto, poi "Prova
+connessione". Il segreto è cifrato come le password SMB.
+
+Il server deve poter uscire in HTTPS verso `login.microsoftonline.com` e
+`graph.microsoft.com` (eventuale proxy: variabile `HTTPS_PROXY` nel compose). I PDF si
+scaricano solo quando cambiano; un elenco ogni 2 minuti resta ampiamente sotto i limiti
+di Graph, che comunque vengono rispettati (attesa `Retry-After`).
+
+### 2.2 WebDAV (Nextcloud, NAS)
+
+Indirizzo della cartella, per esempio:
+- Nextcloud/ownCloud: `https://cloud.azienda.it/remote.php/dav/files/<utente>/SDS`
+- Synology (WebDAV Server attivo): `https://nas.azienda.local:5006/HSE/SDS`
+- QNAP: `https://nas.azienda.local:8081/HSE/SDS`
+
+Per Nextcloud conviene una **password per applicazioni** (Impostazioni → Sicurezza) di un
+utente con la cartella condivisa in sola lettura. `http://` è ammesso solo per server in
+rete interna: la password viaggerebbe in chiaro.
+
+### 2.3 Caricamento diretto
+
+Per le sezioni di tipo "Caricamento diretto" i PDF si caricano dal totem o da una
+postazione: **Manutenzione → Carica PDF** sulla riga della sezione (alla creazione si apre
+da solo). Si possono scegliere più file insieme; la sottocartella facoltativa diventa un
+filtro a chip. Un file con lo stesso nome di uno esistente lo sostituisce (nuova
+revisione). Limite: 200 MB per file (impostazione `maxDimensionePDFMB`).
+
+I PDF caricati stanno sul server in `/opt/totem/data/uploads/<sezione>/` e passano dagli
+stessi controlli delle altre origini (PDF valido, completo). Eliminare la sezione o
+cambiarne il tipo elimina anche i file caricati: vanno inclusi nel backup.
 
 ---
 
@@ -342,9 +404,10 @@ vecchio e avviare.
 | Cosa | Dove | Note |
 |---|---|---|
 | Configurazione | `/opt/totem/data/config.json` (e `data/backup/`) | Sezioni, PIN (hash), dispositivi, impostazioni |
-| Chiave di cifratura | `/opt/totem/secrets/key` | Senza la chiave le password SMB vanno reinserite dal totem. Conservarla separata dal backup di `data`. |
+| Chiave di cifratura | `/opt/totem/secrets/key` | Senza la chiave le password (SMB, WebDAV) e i segreti OneDrive vanno reinseriti dal totem. Conservarla separata dal backup di `data`. |
 | Logo | `/opt/totem/data/logo.*` | Se presente |
-| PDF | non serve | Si ricostruiscono dalle share alla prima scansione |
+| PDF caricati | `/opt/totem/data/uploads/` | **Da salvare**: per le sezioni a caricamento diretto è l'unica copia |
+| PDF delle altre origini | non serve | Si ricostruiscono da share, OneDrive o WebDAV alla prima scansione |
 
 Ripristino su un server nuovo:
 1. Installare come al punto 1.3.

@@ -22,6 +22,8 @@ function syncSoon() {
   setTimeout(() => m.syncNow(), 60000);
 }
 
+export { syncSoon, useServerOnline };
+
 /** Controlla periodicamente il server: senza server la configurazione è in sola lettura. */
 function useServerOnline() {
   const [online, setOnline] = useState(true);
@@ -103,11 +105,14 @@ export function Maint() {
                   {sec.emergenza && <span class="badge emerg">{S.emergency}</span>}
                   {sec.documents != null && <small>· {S.docCount(sec.documents)}</small>}
                 </div>
-                <div class="p">{sec.percorso}</div>
+                <div class="p">{sec.tipo === 'upload' ? S.uploadSource : sec.tipo && sec.tipo !== 'smb' ? `${S.sources[sec.tipo]} · ${sec.percorso}` : sec.percorso}</div>
               </div>
               <div class="b">
                 <button class="btn" aria-label={S.moveUp} disabled={ro || i === 0} onClick={() => move(i, -1)}><Icon name="su" /></button>
                 <button class="btn" aria-label={S.moveDown} disabled={ro || i === rows.length - 1} onClick={() => move(i, 1)}><Icon name="giu" /></button>
+                {sec.tipo === 'upload' && (
+                  <button class="btn" data-testid="open-uploads" disabled={ro} onClick={() => go('uploads', { id: sec.id })}><Icon name="carica" />{S.uploadBtn}</button>
+                )}
                 <button class="btn" disabled={ro || !list} onClick={() => go('form', { id: sec.id })}><Icon name="matita" />{S.edit}</button>
                 <button class="btn" disabled={ro} onClick={() => setConfirm(sec)}><Icon name="cestino" />{S.del}</button>
               </div>
@@ -170,10 +175,12 @@ export function MaintForm({ id }) {
             section={sec}
             readOnly={!online}
             onCancel={() => go('maint')}
-            onSaved={() => {
+            onSaved={(newId, tipo) => {
               setToast(S.saved);
               syncSoon();
-              go('maint');
+              // una nuova sezione a caricamento diretto è vuota: si passa subito al caricamento
+              if (tipo === 'upload' && !id) go('uploads', { id: newId });
+              else go('maint');
             }}
           />
         )}

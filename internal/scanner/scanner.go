@@ -17,6 +17,7 @@ import (
 
 	"github.com/toigoweb/totem/internal/config"
 	"github.com/toigoweb/totem/internal/smbsrc"
+	"github.com/toigoweb/totem/internal/sources"
 	"github.com/toigoweb/totem/internal/synclog"
 )
 
@@ -109,7 +110,7 @@ type Scanner struct {
 
 func New(o Options) (*Scanner, error) {
 	if o.Connect == nil {
-		o.Connect = smbsrc.Connect
+		o.Connect = sources.Connect
 	}
 	if o.Now == nil {
 		o.Now = time.Now
@@ -313,7 +314,12 @@ func (s *Scanner) target(sec config.Section) (smbsrc.Target, error) {
 		}
 		pwd = p
 	}
-	return smbsrc.Target{Path: sec.Share.Percorso, User: sec.Share.Utente, Password: pwd, Recursive: sec.Share.Sottocartelle, Port: s.o.Port}, nil
+	t := smbsrc.Target{Type: sec.Share.Kind(), Path: sec.Share.Percorso, User: sec.Share.Utente, Password: pwd,
+		Tenant: sec.Share.Tenant, Recursive: sec.Share.Sottocartelle, Port: s.o.Port}
+	if t.Type == config.SourceUpload {
+		t.Path, t.Recursive = sources.UploadDir(s.o.DataDir, sec.ID), true
+	}
+	return t, nil
 }
 
 func connLevel(code string) bool {

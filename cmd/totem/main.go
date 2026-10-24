@@ -28,12 +28,14 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 	_ "time/tzdata" // TZ=Europe/Rome anche su distroless
 
 	"github.com/toigoweb/totem/internal/api"
 	"github.com/toigoweb/totem/internal/config"
+	"github.com/toigoweb/totem/internal/graphsrc"
 	"github.com/toigoweb/totem/internal/scanner"
 	"github.com/toigoweb/totem/internal/synclog"
 	"github.com/toigoweb/totem/internal/version"
@@ -128,6 +130,13 @@ func serve() int {
 	}
 	// TOTEM_SMB_PORT serve solo ai test (Samba su una porta diversa dalla 445)
 	smbPort, _ := strconv.Atoi(os.Getenv("TOTEM_SMB_PORT"))
+	// TOTEM_GRAPH_URL / TOTEM_LOGIN_URL: solo test (Microsoft Graph simulato)
+	if v := os.Getenv("TOTEM_GRAPH_URL"); v != "" {
+		graphsrc.GraphBase = strings.TrimRight(v, "/")
+	}
+	if v := os.Getenv("TOTEM_LOGIN_URL"); v != "" {
+		graphsrc.LoginBase = strings.TrimRight(v, "/")
+	}
 	sc, err := scanner.New(scanner.Options{DataDir: dataDir, Config: store, Cipher: ci, Settings: settings, Log: syncLog, Logger: logger, Port: smbPort})
 	if err != nil {
 		logger.Error("scanner", "err", err)

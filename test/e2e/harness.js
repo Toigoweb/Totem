@@ -43,6 +43,7 @@ export class Totem {
     this.dir = join(WORK, 'run', this.id);
     this.share = join(WORK, 'share', this.id);
     this.log = '';
+    this.env = {}; // variabili aggiuntive per il server (es. Graph simulato)
   }
 
   async setup() {
@@ -69,7 +70,7 @@ export class Totem {
   async start() {
     this.proc = spawn(BIN, ['serve'], {
       env: { ...process.env, TOTEM_DATA: join(this.dir, 'data'), TOTEM_SECRETS: join(this.dir, 'secrets'),
-        TOTEM_ADDR: `127.0.0.1:${this.port}`, TOTEM_INTERNAL_ADDR: `127.0.0.1:${this.internal}`, TOTEM_SMB_PORT: String(SMB_PORT), TZ: 'Europe/Rome' },
+        TOTEM_ADDR: `127.0.0.1:${this.port}`, TOTEM_INTERNAL_ADDR: `127.0.0.1:${this.internal}`, TOTEM_SMB_PORT: String(SMB_PORT), TZ: 'Europe/Rome', ...this.env },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     this.proc.stdout.on('data', (b) => (this.log += b));
@@ -105,6 +106,14 @@ export class Totem {
     mkdirSync(dirname(p), { recursive: true });
     execFileSync('python3', [join(ROOT, 'test', 'fixtures', 'genpdf.py'), p, kind, title, '3']);
     chmodSync(p, 0o644);
+    return p;
+  }
+
+  /** Crea un PDF fuori dalla share (da caricare dal browser) e ne restituisce il percorso. */
+  makePdf(name, kind = 'sds', title = name) {
+    const p = join(this.dir, 'locali', name);
+    mkdirSync(dirname(p), { recursive: true });
+    execFileSync('python3', [join(ROOT, 'test', 'fixtures', 'genpdf.py'), p, kind, title, '3']);
     return p;
   }
 

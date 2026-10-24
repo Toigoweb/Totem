@@ -121,6 +121,9 @@ func (s *Server) Handler() http.Handler {
 	m.Handle("DELETE /api/maint/sections/{id}", s.maintOnly(http.HandlerFunc(s.deleteSection)))
 	m.Handle("POST /api/maint/sections-order", s.maintOnly(http.HandlerFunc(s.orderSections)))
 	m.Handle("POST /api/maint/test", s.maintOnly(http.HandlerFunc(s.testConnection)))
+	m.Handle("GET /api/maint/sections/{id}/files", s.maintOnly(http.HandlerFunc(s.listUploads)))
+	m.Handle("PUT /api/maint/sections/{id}/files", s.maintOnly(http.HandlerFunc(s.putUpload)))
+	m.Handle("DELETE /api/maint/sections/{id}/files", s.maintOnly(http.HandlerFunc(s.deleteUpload)))
 	m.Handle("POST /api/maint/pin", s.maintOnly(http.HandlerFunc(s.changePin)))
 
 	// dispositivi: postazioni, elenco e revoca, documenti scartati

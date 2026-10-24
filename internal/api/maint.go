@@ -5,12 +5,14 @@ import (
 	"encoding/hex"
 	"errors"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/toigoweb/totem/internal/auth"
 	"github.com/toigoweb/totem/internal/config"
 	"github.com/toigoweb/totem/internal/smbsrc"
+	"github.com/toigoweb/totem/internal/sources"
 )
 
 // ---------------------------------------------------------------------------
@@ -96,8 +98,10 @@ type sectionOut struct {
 	Icona         string `json:"icona"`
 	Ordine        int    `json:"ordine"`
 	Emergenza     bool   `json:"emergenza"`
+	Tipo          string `json:"tipo"`
 	Percorso      string `json:"percorso"`
 	Utente        string `json:"utente"`
+	Tenant        string `json:"tenant"`
 	HasPassword   bool   `json:"hasPassword"`
 	Sottocartelle bool   `json:"sottocartelle"`
 	Documents     int    `json:"documents"`
@@ -115,7 +119,7 @@ func (s *Server) listSections(w http.ResponseWriter, r *http.Request) {
 	cfg := s.o.Config.Get()
 	for _, sec := range cfg.SortedSections() {
 		out = append(out, sectionOut{ID: sec.ID, Nome: sec.Nome, Icona: sec.Icona, Ordine: sec.Ordine, Emergenza: sec.Emergenza,
-			Percorso: sec.Share.Percorso, Utente: sec.Share.Utente, HasPassword: sec.Share.Password != "",
+			Tipo: sec.Share.Kind(), Percorso: sec.Share.Percorso, Utente: sec.Share.Utente, Tenant: sec.Share.Tenant, HasPassword: sec.Share.Password != "",
 			Sottocartelle: sec.Share.Sottocartelle, Documents: counts[sec.ID]})
 	}
 	maxN := config.MaxSections
@@ -126,6 +130,8 @@ type sectionIn struct {
 	Nome          string `json:"nome"`
 	Icona         string `json:"icona"`
 	Emergenza     bool   `json:"emergenza"`
+	Tipo          string `json:"tipo"`
+	Tenant        string `json:"tenant"`
 	Percorso      string `json:"percorso"`
 	Utente        string `json:"utente"`
 	Password      string `json:"password"`
@@ -140,9 +146,25 @@ type testGrant struct {
 	expires     time.Time
 }
 
-func fingerprint(path, user, pwd string) string {
-	h := sha256.Sum256([]byte(strings.ToLower(path) + "\x00" + user + "\x00" + pwd))
+func fingerprint(kind, path, user, pwd, tenant string) string {
+	h := sha256.Sum256([]byte(kind + "\x00" + strings.ToLower(path) + "\x00" + user + "\x00" + pwd + "\x00" + strings.ToLower(tenant)))
 	return hex.EncodeToString(h[:])
+}
+
+// shareOf normalizza l'origine: per il caricamento diretto non servono percorso né credenziali.
+func shareOf(in sectionIn) config.Share {
+	sh := config.Share{Tipo: in.Tipo, Percorso: strings.TrimSpace(in.Percorso), Utente: strings.TrimSpace(in.Utente),
+		Tenant: strings.TrimSpace(in.Tenant), Sottocartelle: in.Sottocartelle}
+	if sh.Tipo == "" {
+		sh.Tipo = config.SourceSMB
+	}
+	if sh.Tipo == config.SourceUpload {
+		sh.Percorso, sh.Utente, sh.Tenant, sh.Sottocartelle = "", "", "", true
+	}
+	if sh.Tipo != config.SourceOneDrive {
+		sh.Tenant = ""
+	}
+	return sh
 }
 
 func (s *Server) grantTest(fp string) string {
@@ -179,21 +201,25 @@ func (s *Server) storedPassword(sectionID string) (string, error) {
 
 func (s *Server) testConnection(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		SectionID     string `json:"sectionId"`
-		Percorso      string `json:"percorso"`
-		Utente        string `json:"utente"`
-		Password      string `json:"password"`
-		Sottocartelle bool   `json:"sottocartelle"`
+		sectionIn
+		SectionID string `json:"sectionId"`
 	}
 	if !readJSON(w, r, &req) {
 		return
 	}
-	if !config.ValidSharePath(req.Percorso) {
-		writeJSON(w, http.StatusOK, map[string]any{"ok": false, "code": smbsrc.ErrInvalidPath})
+	sh := shareOf(req.sectionIn)
+	// stesse regole del salvataggio (nome e icona fittizi: qui conta solo l'origine)
+	if err := config.ValidateSection(config.Section{Nome: "prova", Icona: "documento", Share: sh}); err != nil {
+		var ve *config.ValidationError
+		code := smbsrc.ErrInvalidPath
+		if errors.As(err, &ve) && ve.Field != "percorso" {
+			code = "invalid_" + ve.Field
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": false, "code": code})
 		return
 	}
-	if req.Utente != "" && !config.ValidUser(req.Utente) {
-		writeJSON(w, http.StatusOK, map[string]any{"ok": false, "code": "invalid_user"})
+	if sh.Tipo == config.SourceUpload {
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "pdfCount": 0, "testToken": s.grantTest(fingerprint(sh.Tipo, "", "", "", ""))})
 		return
 	}
 	pwd := req.Password
@@ -205,14 +231,15 @@ func (s *Server) testConnection(w http.ResponseWriter, r *http.Request) {
 		}
 		pwd = p
 	}
-	n, err := s.o.Scanner.TestConnection(r.Context(), smbsrc.Target{Path: req.Percorso, User: req.Utente, Password: pwd, Recursive: req.Sottocartelle})
+	n, err := s.o.Scanner.TestConnection(r.Context(), smbsrc.Target{Type: sh.Tipo, Path: sh.Percorso, User: sh.Utente, Password: pwd,
+		Tenant: sh.Tenant, Recursive: sh.Sottocartelle})
 	if err != nil {
 		code := smbsrc.Code(err)
-		s.o.Logger.Info("prova di connessione fallita", "codice", code)
+		s.o.Logger.Info("prova di connessione fallita", "tipo", sh.Tipo, "codice", code, "err", err.Error())
 		writeJSON(w, http.StatusOK, map[string]any{"ok": false, "code": code})
 		return
 	}
-	tok := s.grantTest(fingerprint(req.Percorso, req.Utente, pwd))
+	tok := s.grantTest(fingerprint(sh.Tipo, sh.Percorso, sh.Utente, pwd, sh.Tenant))
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "pdfCount": n, "testToken": tok})
 }
 
@@ -231,17 +258,17 @@ func (s *Server) createSection(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	in.Nome = strings.TrimSpace(in.Nome)
-	sec := config.Section{ID: auth.NewID("s"), Nome: in.Nome, Icona: in.Icona, Emergenza: in.Emergenza,
-		Share: config.Share{Percorso: in.Percorso, Utente: in.Utente, Sottocartelle: in.Sottocartelle}}
+	sec := config.Section{ID: auth.NewID("s"), Nome: in.Nome, Icona: in.Icona, Emergenza: in.Emergenza, Share: shareOf(in)}
 	if err := config.ValidateSection(sec); err != nil {
 		validationResponse(w, err)
 		return
 	}
-	if !s.checkTest(in.TestToken, fingerprint(in.Percorso, in.Utente, in.Password)) {
+	upload := sec.Share.Tipo == config.SourceUpload
+	if !upload && !s.checkTest(in.TestToken, fingerprint(sec.Share.Tipo, sec.Share.Percorso, sec.Share.Utente, in.Password, sec.Share.Tenant)) {
 		jsonErr(w, http.StatusConflict, "test_required")
 		return
 	}
-	if in.Password != "" {
+	if in.Password != "" && !upload {
 		enc, err := s.o.Cipher.Encrypt(sec.ID, in.Password)
 		if err != nil {
 			jsonErr(w, http.StatusInternalServerError, "internal")
@@ -293,12 +320,18 @@ func (s *Server) updateSection(w http.ResponseWriter, r *http.Request) {
 	}
 	next := old
 	next.Nome, next.Icona, next.Emergenza = strings.TrimSpace(in.Nome), in.Icona, in.Emergenza
-	next.Share.Percorso, next.Share.Utente, next.Share.Sottocartelle = in.Percorso, in.Utente, in.Sottocartelle
+	sh := shareOf(in)
+	sh.Password = old.Share.Password
+	next.Share = sh
 	if err := config.ValidateSection(next); err != nil {
 		validationResponse(w, err)
 		return
 	}
-	shareChanged := in.Password != "" || old.Share.Percorso != in.Percorso || old.Share.Utente != in.Utente
+	if sh.Tipo == config.SourceUpload {
+		next.Share.Password = ""
+	}
+	shareChanged := sh.Tipo != config.SourceUpload && (in.Password != "" || old.Share.Kind() != sh.Tipo ||
+		old.Share.Percorso != sh.Percorso || old.Share.Utente != sh.Utente || old.Share.Tenant != sh.Tenant)
 	if shareChanged {
 		pwd := in.Password
 		if pwd == "" {
@@ -309,7 +342,7 @@ func (s *Server) updateSection(w http.ResponseWriter, r *http.Request) {
 			}
 			pwd = p
 		}
-		if !s.checkTest(in.TestToken, fingerprint(in.Percorso, in.Utente, pwd)) {
+		if !s.checkTest(in.TestToken, fingerprint(sh.Tipo, sh.Percorso, sh.Utente, pwd, sh.Tenant)) {
 			jsonErr(w, http.StatusConflict, "test_required")
 			return
 		}
@@ -336,6 +369,9 @@ func (s *Server) updateSection(w http.ResponseWriter, r *http.Request) {
 		jsonErr(w, http.StatusNotFound, "not_found")
 		return
 	}
+	if old.Share.Kind() == config.SourceUpload && sh.Tipo != config.SourceUpload {
+		_ = os.RemoveAll(sources.UploadDir(s.o.DataDir, id)) // i PDF caricati non servono più
+	}
 	s.o.Logger.Info("sezione modificata", "sezione", id)
 	writeJSON(w, http.StatusOK, map[string]any{"id": id})
 }
@@ -356,6 +392,7 @@ func (s *Server) deleteSection(w http.ResponseWriter, r *http.Request) {
 		jsonErr(w, http.StatusNotFound, "not_found")
 		return
 	}
+	_ = os.RemoveAll(sources.UploadDir(s.o.DataDir, id))
 	s.o.Logger.Info("sezione eliminata", "sezione", id)
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
