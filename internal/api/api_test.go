@@ -506,7 +506,9 @@ func TestStaticFallback(t *testing.T) {
 func TestStations(t *testing.T) {
 	h := newHarness(t)
 	totem, mt := h.pair("1234")
-	M := func(c *http.Client, tok, method, path string, body any) resp { return h.do(c, method, path, body, MaintHeader, tok) }
+	M := func(c *http.Client, tok, method, path string, body any) resp {
+		return h.do(c, method, path, body, MaintHeader, tok)
+	}
 
 	r := M(totem, mt, "POST", "/api/maint/stations/pair-code", map[string]any{"nome": "PC ufficio IT"})
 	if r.code != 200 || r.body["expiresInSec"].(float64) != 600 {
