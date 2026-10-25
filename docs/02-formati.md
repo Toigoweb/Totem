@@ -159,6 +159,9 @@ sync) sta in `/data/state/heartbeat.json`, per non riscrivere config.json a ogni
 /data/blobs/<sha256>         PDF validati
 /data/blobs/tmp/             download in corso, ripuliti all'avvio
 /data/logs/sync.log          log JSON per riga, rotazione a 5 MB × 5 file
+/data/uploads/<sezione>/     PDF caricati direttamente (sezioni di tipo upload)
+/data/safety.json            mappa incidenti: planimetrie ed eventi
+/data/maps/<sha256>          immagini delle planimetrie (PNG o JPEG)
 /secrets/key                 32 byte casuali, permessi 0600
 ```
 
@@ -205,3 +208,47 @@ del suo reparto, più:
 
 `hash` è calcolato sulla vista (contenuti e dati del reparto): se cambia un avviso, il
 totem lo riprende alla sync successiva. `version` resta quella globale del server.
+
+## Mappa incidenti
+
+`/data/safety.json` (separato da config.json perché cresce nel tempo):
+
+```json
+{
+  "schemaVersion": 1,
+  "inizio": "2026-01-01",
+  "mappe": [
+    { "id": "m_a1b2c3", "nome": "Stabilimento", "immagine": "<sha256>", "formato": "image/png",
+      "byte": 182340, "larghezza": 2400, "altezza": 1600, "reparti": [] }
+  ],
+  "eventi": [
+    { "id": "e_d4e5f6", "mappa": "m_a1b2c3", "x": 0.31, "y": 0.42, "data": "2026-10-15",
+      "tipo": "quasi", "nota": "muletto in retromarcia" }
+  ]
+}
+```
+
+| Campo | Regole |
+|---|---|
+| `inizio` | Data da cui la registrazione è completa. Senza, il contatore dei giorni senza infortuni non compare. |
+| `mappe` | Massimo 10. Immagine PNG o JPEG, da 100 a 10 000 pixel per lato, massimo 15 MB. `reparti` vuoto = tutti. |
+| `eventi[].x`, `y` | Posizione da 0 a 1 (frazione di larghezza e altezza), indipendente dalla risoluzione. |
+| `eventi[].tipo` | `infortunio`, `medicazione`, `quasi` (quasi incidente), `danno` (danno a cose). |
+| `eventi[].data` | AAAA-MM-GG, non nel futuro. Massimo 5000 eventi. |
+| `eventi[].nota` | Facoltativa, massimo 200 caratteri. Solo manutenzione ed esportazione CSV: **non va mai nel manifest**. |
+
+Nel manifest di ogni dispositivo, se ha almeno una planimetria visibile:
+
+```json
+"safety": {
+  "maps": [{ "id": "m_a1b2c3", "name": "Stabilimento", "sha256": "…", "type": "image/png", "size": 182340, "width": 2400, "height": 1600 }],
+  "events": [{ "map": "m_a1b2c3", "x": 0.31, "y": 0.42, "date": "2026-10-15", "type": "quasi" }],
+  "lastInjury": "2026-09-01",
+  "since": "2026-01-01"
+}
+```
+
+Vanno al totem solo gli eventi degli ultimi 3 anni; `lastInjury` considera anche quelli più
+vecchi. Le immagini si scaricano da `GET /api/maps/<sha256>` (cookie del dispositivo), con
+verifica SHA-256, e restano in Cache Storage come i PDF.
+

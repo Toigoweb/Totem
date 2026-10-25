@@ -132,6 +132,7 @@ export function Maint() {
           <button class="btn" disabled={ro} data-testid="open-contacts" onClick={() => go('contacts')}><Icon name="croce" />{S.usefulNumbers}</button>
           <button class="btn" disabled={ro} data-testid="open-notices" onClick={() => go('notices')}><Icon name="info" />{S.noticesTitle}</button>
           <button class="btn" disabled={ro} data-testid="open-screensaver" onClick={() => go('screensaverSettings')}><Icon name="orologio" />{S.screensaverTitle}</button>
+          <button class="btn" disabled={ro} data-testid="open-safety-admin" onClick={() => go('safetyAdmin')}><Icon name="mappa" />{S.safetyAdmin}</button>
           <button class="btn" disabled={ro} data-testid="open-problems" onClick={() => go('problems')}><Icon name="avviso" />{S.problems}</button>
           <button class="btn" disabled={ro} data-testid="open-monitoring" onClick={() => go('monitoring')}><Icon name="sync" />{S.monitorTitle}</button>
           <button class="btn" disabled={ro} onClick={() => go('changePin')}><Icon name="lucchetto" />{S.changePin}</button>

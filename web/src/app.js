@@ -25,7 +25,7 @@ export const app = createStore({
   history: [],
   sections: [],
   docs: [],
-  extras: { department: null, contacts: [], notices: [], screensaver: null },
+  extras: { department: null, contacts: [], notices: [], screensaver: null, safety: null },
   settings: {},
   meta: { lastSuccess: null, lastError: null, syncLog: [] },
   sync: { running: false, progress: null, lastError: null, online: true, nextAt: null },
@@ -82,7 +82,7 @@ export async function reloadData() {
     sections: (sections || []).slice().sort((a, b) => a.order - b.order),
     settings: settings || {},
     docs,
-    extras: { department: null, contacts: [], notices: [], screensaver: null, ...(extras || {}) },
+    extras: { department: null, contacts: [], notices: [], screensaver: null, safety: null, ...(extras || {}) },
     meta: { lastSuccess: lastSuccess || null, lastError: lastError || null, syncLog: syncLog || [] },
   });
 }

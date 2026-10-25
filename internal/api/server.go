@@ -16,6 +16,7 @@ import (
 
 	"github.com/toigoweb/totem/internal/auth"
 	"github.com/toigoweb/totem/internal/config"
+	"github.com/toigoweb/totem/internal/safety"
 	"github.com/toigoweb/totem/internal/scanner"
 	"github.com/toigoweb/totem/internal/smbsrc"
 	"github.com/toigoweb/totem/internal/synclog"
@@ -47,7 +48,8 @@ type Options struct {
 	Log      *synclog.Log
 	Settings config.Settings
 	DataDir  string
-	Static   fs.FS // contenuto di web/dist
+	Safety   *safety.Store // planimetrie ed eventi (mappa incidenti)
+	Static   fs.FS         // contenuto di web/dist
 	Version  string
 	Logger   *slog.Logger
 	Now      func() time.Time
@@ -108,6 +110,7 @@ func (s *Server) Handler() http.Handler {
 	// dispositivo abbinato
 	m.Handle("GET /manifest.json", s.device(http.HandlerFunc(s.manifest)))
 	m.Handle("GET /api/files/{sha}", s.device(http.HandlerFunc(s.file)))
+	m.Handle("GET /api/maps/{sha}", s.device(http.HandlerFunc(s.mapImage)))
 	m.Handle("POST /api/heartbeat", s.device(http.HandlerFunc(s.heartbeat)))
 	m.Handle("GET /api/status", s.device(http.HandlerFunc(s.status)))
 	m.Handle("POST /api/scan", s.device(http.HandlerFunc(s.scanNow)))
@@ -144,6 +147,17 @@ func (s *Server) Handler() http.Handler {
 	m.Handle("DELETE /api/maint/monitor/token", s.maintOnly(http.HandlerFunc(s.deleteMonitorToken)))
 	m.Handle("PUT /api/maint/monitor", s.maintOnly(http.HandlerFunc(s.putMonitor)))
 	m.HandleFunc("GET /api/monitor", s.monitor)
+
+	// mappa incidenti
+	m.Handle("GET /api/maint/safety", s.maintOnly(http.HandlerFunc(s.getSafety)))
+	m.Handle("GET /api/maint/safety/export", s.maintOnly(http.HandlerFunc(s.exportSafety)))
+	m.Handle("PUT /api/maint/safety/settings", s.maintOnly(http.HandlerFunc(s.putSafetySettings)))
+	m.Handle("POST /api/maint/safety/maps", s.maintOnly(http.HandlerFunc(s.addSafetyMap)))
+	m.Handle("PUT /api/maint/safety/maps/{id}", s.maintOnly(http.HandlerFunc(s.updateSafetyMap)))
+	m.Handle("DELETE /api/maint/safety/maps/{id}", s.maintOnly(http.HandlerFunc(s.deleteSafetyMap)))
+	m.Handle("POST /api/maint/safety/events", s.maintOnly(http.HandlerFunc(s.putSafetyEvent)))
+	m.Handle("PUT /api/maint/safety/events/{id}", s.maintOnly(http.HandlerFunc(s.putSafetyEvent)))
+	m.Handle("DELETE /api/maint/safety/events/{id}", s.maintOnly(http.HandlerFunc(s.deleteSafetyEvent)))
 
 	// fase 2: telefoni (404 finché globali.fase2 è false)
 	m.Handle("POST /api/maint/devices/pair-code", s.phase2(s.maintOnly(http.HandlerFunc(s.pairCode))))

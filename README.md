@@ -348,6 +348,28 @@ minuto per non segnare lo schermo. Un tocco o un tasto lo chiude, senza attivare
 sta sotto. Per spegnere davvero la retroilluminazione usare gli orari di Fully Kiosk
 (tablet) o di Windows (PC).
 
+### Mappa incidenti
+
+Mostra sul totem **dove** succedono gli eventi, per far vedere la situazione a tutti.
+Da **Manutenzione → Mappa incidenti**:
+
+1. **Planimetrie**: nome e immagine PNG o JPEG (pianta, foto o scansione; da un PDF va
+   esportata come immagine), fino a 10, per tutti i reparti o solo per alcuni.
+2. **Eventi**: si tocca la planimetria nel punto giusto e si indicano data e tipo:
+   infortunio, medicazione, quasi incidente, danno a cose. Toccando un punto lo si
+   modifica o elimina. La **nota** è facoltativa e resta in manutenzione e nell'export:
+   non compare sul totem. Non scriverci nomi né dati sulla salute.
+3. **Registrazione completa dal**: la data da cui tutti gli eventi sono segnati qui.
+   Attiva il contatore **giorni senza infortuni** in Home, nella mappa e nel salvaschermo.
+   Senza questa data il contatore non compare, perché non sarebbe affidabile.
+4. **Esporta eventi (CSV)**: elenco completo con note, separato da `;`, si apre in Excel.
+
+Sul totem, il riquadro "Situazione sicurezza" in Home apre la mappa di calore: periodo
+(3 mesi, 12 mesi, 3 anni), tipi da includere (toccando i conteggi), punti con una forma
+diversa per tipo. Gli infortuni pesano più dei quasi incidenti. Funziona offline.
+
+La mappa non sostituisce il registro e le denunce di infortunio previsti dalla legge.
+
 ### Monitoraggio
 
 Monitoraggio → **Genera token**: il token si mostra una volta sola. Poi:
@@ -406,6 +428,7 @@ vecchio e avviare.
 | Configurazione | `/opt/totem/data/config.json` (e `data/backup/`) | Sezioni, PIN (hash), dispositivi, impostazioni |
 | Chiave di cifratura | `/opt/totem/secrets/key` | Senza la chiave le password (SMB, WebDAV) e i segreti OneDrive vanno reinseriti dal totem. Conservarla separata dal backup di `data`. |
 | Logo | `/opt/totem/data/logo.*` | Se presente |
+| Mappa incidenti | `/opt/totem/data/safety.json` e `data/maps/` | **Da salvare**: planimetrie ed eventi esistono solo qui |
 | PDF caricati | `/opt/totem/data/uploads/` | **Da salvare**: per le sezioni a caricamento diretto è l'unica copia |
 | PDF delle altre origini | non serve | Si ricostruiscono da share, OneDrive o WebDAV alla prima scansione |
 

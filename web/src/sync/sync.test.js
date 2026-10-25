@@ -2,7 +2,7 @@ import 'fake-indexeddb/auto';
 import { IDBFactory } from 'fake-indexeddb';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { openDB } from './db.js';
-import { runSync, recordFailure, visibleDocuments, SyncError, CACHE_NAME, fileURL } from './sync.js';
+import { runSync, recordFailure, visibleDocuments, SyncError, CACHE_NAME, fileURL, mapURL } from './sync.js';
 import { findSdsSections } from './sds.js';
 
 // ---- simulazioni di Cache Storage e del server ----
@@ -46,7 +46,8 @@ class FakeServer {
   remove(id) { this.docs = this.docs.filter((d) => d.id !== id); this.version++; }
   manifest() {
     return { schemaVersion: 1, version: this.version, hash: 'h' + this.version, generatedAt: '2026-10-24T08:00:00Z',
-      settings: { spaceMarginMB: 0 }, sections: [{ id: 's_a', name: 'A', icon: 'flacone', order: 1, emergency: false }], documents: this.docs };
+      settings: { spaceMarginMB: 0 }, sections: [{ id: 's_a', name: 'A', icon: 'flacone', order: 1, emergency: false }], documents: this.docs,
+      ...(this.safety ? { safety: this.safety } : {}) };
   }
   fetch = async (url) => {
     this.requests.push(url);
@@ -240,5 +241,37 @@ describe('analisi SDS', () => {
 
   it('documento normale: non riconosciuto', () => {
     expect(findSdsSections(['Piano di evacuazione\nRiferimento alla sezione 4 del manuale']).recognized).toBe(false);
+  });
+});
+
+describe('planimetrie della mappa incidenti', () => {
+  it('le scarica con verifica, le conserva nei metadati e le toglie quando spariscono', async () => {
+    await srv.add('s_a/uno.pdf', 's_a', 'uno');
+    const img = enc.encode('immagine-png-finta');
+    const h = await sha(img);
+    srv.files.set(h, img);
+    srv.safety = { maps: [{ id: 'm1', name: 'Stabilimento', sha256: h, type: 'image/png', size: img.byteLength, width: 300, height: 200 }],
+      events: [{ map: 'm1', x: 0.5, y: 0.5, date: '2026-10-01', type: 'quasi' }], lastInjury: '', since: '2026-01-01' };
+    srv.version++;
+    await sync();
+    const store = caches.stores.get(CACHE_NAME);
+    expect(store.has(mapURL(h))).toBe(true);
+    expect((await db.getMeta('extras')).safety.events).toHaveLength(1);
+
+    srv.corrupt = h; // un'immagine alterata non entra in cache
+    srv.safety = null;
+    srv.version++;
+    await sync();
+    expect(store.has(mapURL(h))).toBe(false);
+    expect((await db.getMeta('extras')).safety).toBe(null);
+  });
+
+  it('immagine alterata: sync fallita, indice invariato', async () => {
+    const img = enc.encode('immagine');
+    const h = await sha(img);
+    srv.files.set(h, img);
+    srv.corrupt = h;
+    srv.safety = { maps: [{ id: 'm1', name: 'S', sha256: h, type: 'image/png', size: img.byteLength, width: 1, height: 1 }], events: [] };
+    await expect(sync()).rejects.toMatchObject({ code: 'integrity' });
   });
 });

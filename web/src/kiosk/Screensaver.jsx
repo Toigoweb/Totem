@@ -5,10 +5,11 @@
 import { useEffect, useState } from 'preact/hooks';
 import { Icon } from '../components/Icon.jsx';
 import { S } from '../strings.js';
-import { app, activeNotices } from '../app.js';
+import { app, activeNotices, localDay } from '../app.js';
 import { useStore } from '../store.js';
 import { inWindow } from './updates.js';
 import { fmtTime } from '../format.js';
+import { daysWithoutInjury } from '../heatmap.js';
 
 const BLOCKED = new Set(['wizard', 'pin', 'changePin']);
 
@@ -60,6 +61,8 @@ export function Screensaver() {
   const contacts = s.extras.contacts || [];
   const notices = activeNotices(s.extras.notices, now);
   const dep = s.extras.department;
+  const sf = s.extras.safety;
+  const days = sf ? daysWithoutInjury(sf.lastInjury, sf.since, localDay(now)) : null;
   return (
     <div class={`salvaschermo ${shown === 'nero' ? 'nero' : ''}`} data-testid="screensaver" data-mode={shown} onClick={close} role="button"
       aria-label={S.ssTouch}>
@@ -76,6 +79,7 @@ export function Screensaver() {
                 </ul>
               </div>
             )}
+            {days !== null && <div class="giorni" data-testid="ss-days"><strong>{days}</strong> {S.daysNoInjuryShort}</div>}
             {notices.map((n) => (
               <div key={n.id} class="banner"><Icon name={n.level === 'attenzione' ? 'avviso' : 'info'} />
                 <div><strong>{n.level === 'attenzione' ? S.noticeWarn : S.noticeInfo}:</strong> {n.text}</div></div>

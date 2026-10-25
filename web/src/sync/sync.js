@@ -12,6 +12,7 @@ import { analyzePdf } from './sds.js';
 
 export const CACHE_NAME = 'totem-pdf-v1';
 export const fileURL = (sha) => `/api/files/${sha}`;
+export const mapURL = (sha) => `/api/maps/${sha}`;
 
 export class SyncError extends Error {
   /** @param {'offline'|'device'|'server'|'space'|'download'|'integrity'|'storage'|'busy'} code */
@@ -84,10 +85,16 @@ export async function runSync(o) {
     if (!(await cache.match(fileURL(sha)))) missing.push(sha);
   }
   const sizeOf = new Map(remote.documents.map((d) => [d.sha256, d.size]));
-  const bytesTotal = missing.reduce((n, s) => n + (sizeOf.get(s) || 0), 0);
+  // planimetrie della mappa incidenti: scaricate e verificate come i PDF
+  const maps = (remote.safety && Array.isArray(remote.safety.maps) ? remote.safety.maps : []);
+  const mapMissing = [];
+  for (const m of maps) {
+    if (!mapMissing.some((x) => x.sha256 === m.sha256) && !(await cache.match(mapURL(m.sha256)))) mapMissing.push(m);
+  }
+  const bytesTotal = missing.reduce((n, s) => n + (sizeOf.get(s) || 0), 0) + mapMissing.reduce((n, m) => n + (m.size || 0), 0);
 
   // 2. spazio: prima di scaricare
-  if (missing.length) {
+  if (missing.length || mapMissing.length) {
     const est = await estimate().catch(() => ({}));
     if (est && typeof est.quota === 'number' && typeof est.usage === 'number') {
       const margin = ((remote.settings && remote.settings.spaceMarginMB) || 50) * 1024 * 1024;
@@ -133,6 +140,26 @@ export async function runSync(o) {
     progress({ phase: 'download', done, total: missing.length, bytesDone, bytesTotal });
   }
 
+  for (const m of mapMissing) {
+    let r;
+    try {
+      r = await doFetch(mapURL(m.sha256), { credentials: 'same-origin', cache: 'no-store' });
+    } catch {
+      throw new SyncError('offline', 'connessione persa durante il download', { done, total: missing.length });
+    }
+    if (r.status === 401) throw new SyncError('device', 'token revocato');
+    if (!r.ok) throw new SyncError('download', `planimetria ${m.sha256.slice(0, 12)}: HTTP ${r.status}`);
+    const buf = await r.arrayBuffer();
+    if ((await sha256Hex(buf)) !== m.sha256) throw new SyncError('integrity', `planimetria ${m.sha256.slice(0, 12)}: SHA-256 non corrispondente`);
+    try {
+      await cache.put(mapURL(m.sha256), new Response(buf, { headers: { 'Content-Type': m.type || 'image/png', ETag: `"${m.sha256}"` } }));
+    } catch (e) {
+      if (isQuota(e)) throw new SyncError('space', 'spazio esaurito durante il download', { needed: bytesTotal - bytesDone });
+      throw new SyncError('storage', 'scrittura nella cache non riuscita');
+    }
+    bytesDone += buf.byteLength;
+  }
+
   // documenti già in cache ma senza analisi (es. dopo un aggiornamento dell'app)
   const known = new Set((await db.allSds()).map((s) => s.sha256));
   for (const sha of shas) {
@@ -171,6 +198,7 @@ export async function runSync(o) {
         contacts: remote.contacts || [],
         notices: remote.notices || [],
         screensaver: remote.screensaver || null,
+        safety: remote.safety || null,
       },
       lastSuccess: finishedAt.toISOString(),
       lastAttempt: startedAt.toISOString(),
@@ -181,7 +209,7 @@ export async function runSync(o) {
   });
 
   // 5. pulizia della cache solo dopo il commit
-  const keep = new Set(shas.map(fileURL));
+  const keep = new Set([...shas.map(fileURL), ...maps.map((m) => mapURL(m.sha256))]);
   for (const k of await cache.keys()) {
     const path = new URL(k.url, 'http://x').pathname;
     if (!keep.has(path)) await cache.delete(k);

@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/toigoweb/totem/internal/config"
+	"github.com/toigoweb/totem/internal/safety"
 	"github.com/toigoweb/totem/internal/scanner"
 	"github.com/toigoweb/totem/internal/smbsrc"
 	"github.com/toigoweb/totem/internal/sources"
@@ -43,6 +44,7 @@ type harness struct {
 	cfg   *config.Store
 	ci    *config.Cipher
 	sc    *scanner.Scanner
+	saf   *safety.Store
 	srv   *Server
 	ts    *httptest.Server
 	share string
@@ -76,7 +78,9 @@ func newHarness(t *testing.T) *harness {
 	if err != nil {
 		t.Fatal(err)
 	}
-	h.srv = New(Options{Config: h.cfg, Cipher: h.ci, Scanner: h.sc, Log: sl, Settings: config.DefaultSettings(), DataDir: h.data,
+	h.saf, _ = safety.Open(h.data)
+	h.saf.Now = h.clk.Now
+	h.srv = New(Options{Config: h.cfg, Cipher: h.ci, Scanner: h.sc, Log: sl, Settings: config.DefaultSettings(), DataDir: h.data, Safety: h.saf,
 		Version: "test", Logger: lg, Now: h.clk.Now})
 	h.srv.EnsureSetupCode()
 	h.ts = httptest.NewTLSServer(h.srv.Handler())

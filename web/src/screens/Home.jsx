@@ -1,9 +1,10 @@
 import { Icon } from '../components/Icon.jsx';
 import { TopBar } from '../components/TopBar.jsx';
 import { S } from '../strings.js';
-import { app, go, cycleScale, docsBySection, recentDocs, activeNotices, APP_VERSION } from '../app.js';
+import { app, go, cycleScale, docsBySection, recentDocs, activeNotices, localDay, APP_VERSION } from '../app.js';
 import { useStore } from '../store.js';
 import { fmtDate } from '../format.js';
+import { daysWithoutInjury } from '../heatmap.js';
 
 function cols(n) {
   if (n <= 3) return Math.max(n, 1);
@@ -65,6 +66,8 @@ export function Home() {
   const secName = Object.fromEntries(s.sections.map((x) => [x.id, x.name]));
   const contacts = s.extras.contacts || [];
   const notices = activeNotices(s.extras.notices);
+  const safety = s.extras.safety;
+  const days = safety ? daysWithoutInjury(safety.lastInjury, safety.since, localDay()) : null;
   const title = s.extras.department ? `${S.appTitle} · ${s.extras.department.name}` : S.appTitle;
 
   return (
@@ -114,6 +117,15 @@ export function Home() {
               );
             })}
           </div>
+        )}
+
+        {safety && safety.maps && safety.maps.length > 0 && (
+          <button class="sic-home" data-testid="safety-open" onClick={() => go('safety')}>
+            <Icon name="mappa" />
+            <span class="t">{S.safetyTitle}<small>{S.safetyOpen}</small></span>
+            {days !== null && <span class="g" data-testid="home-days"><strong>{days}</strong>{S.daysNoInjuryShort}</span>}
+            <Icon name="avanti" />
+          </button>
         )}
 
         {recent.length > 0 && (

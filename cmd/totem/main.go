@@ -36,6 +36,7 @@ import (
 	"github.com/toigoweb/totem/internal/api"
 	"github.com/toigoweb/totem/internal/config"
 	"github.com/toigoweb/totem/internal/graphsrc"
+	"github.com/toigoweb/totem/internal/safety"
 	"github.com/toigoweb/totem/internal/scanner"
 	"github.com/toigoweb/totem/internal/synclog"
 	"github.com/toigoweb/totem/internal/version"
@@ -151,8 +152,13 @@ func serve() int {
 		}
 	})
 
+	saf, err := safety.Open(dataDir)
+	if err != nil {
+		logger.Error("mappa incidenti", "err", err)
+		return 1
+	}
 	srv := api.New(api.Options{Config: store, Cipher: ci, Scanner: sc, Log: syncLog, Settings: settings, DataDir: dataDir,
-		Static: web.Dist(), Version: version.Version, Logger: logger})
+		Safety: saf, Static: web.Dist(), Version: version.Version, Logger: logger})
 	srv.EnsureSetupCode()
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

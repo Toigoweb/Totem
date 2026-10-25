@@ -13,11 +13,13 @@ import { Wizard } from './screens/Wizard.jsx';
 import { Devices, PairStation, Problems } from './screens/Devices.jsx';
 import { Screensaver } from './kiosk/Screensaver.jsx';
 import { Uploads } from './screens/Uploads.jsx';
+import { SafetyMap } from './screens/SafetyMap.jsx';
+import { SafetyAdmin } from './screens/SafetyAdmin.jsx';
 import { Departments, Contacts, Notices, ScreensaverSettings, Monitoring } from './screens/Extras.jsx';
 
-const SCREENS = { home: Home, search: Search, section: Section, reader: Reader, status: Status, pin: Pin, maint: Maint, form: MaintForm, changePin: ChangePin, wizard: Wizard, devices: Devices, pairStation: PairStation, problems: Problems, uploads: Uploads,
+const SCREENS = { home: Home, search: Search, section: Section, reader: Reader, status: Status, pin: Pin, maint: Maint, form: MaintForm, changePin: ChangePin, wizard: Wizard, devices: Devices, pairStation: PairStation, problems: Problems, uploads: Uploads, safety: SafetyMap, safetyAdmin: SafetyAdmin,
   departments: Departments, contacts: Contacts, notices: Notices, screensaverSettings: ScreensaverSettings, monitoring: Monitoring };
-const MAINT_ONLY = new Set(['maint', 'form', 'changePin', 'devices', 'pairStation', 'problems', 'uploads', 'departments', 'contacts', 'notices', 'screensaverSettings', 'monitoring']);
+const MAINT_ONLY = new Set(['maint', 'form', 'changePin', 'devices', 'pairStation', 'problems', 'uploads', 'safetyAdmin', 'departments', 'contacts', 'notices', 'screensaverSettings', 'monitoring']);
 
 export function App() {
   const s = useStore(app);

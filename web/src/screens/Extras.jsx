@@ -68,7 +68,7 @@ function ErrBanner({ err }) {
 }
 
 /** Scelta multipla a chip; nessuna scelta = tutti. */
-function Chips({ options, value, onChange, label }) {
+export function Chips({ options, value, onChange, label }) {
   if (!options.length) return null;
   const toggle = (id) => onChange(value.includes(id) ? value.filter((x) => x !== id) : [...value, id]);
   return (

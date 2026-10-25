@@ -67,6 +67,7 @@
 | Numeri utili, avvisi, salvaschermo nel manifest | Arrivano con la sync e restano in IndexedDB: funzionano offline; le date degli avvisi le controlla il totem. |
 | Pagina di monitoraggio | Token dedicato (solo hash in config), HTTP 503 in caso di errore: si integra con qualsiasi strumento senza plugin. |
 | Origini OneDrive, WebDAV, caricamento diretto | Stessa interfaccia `Source` (List/Open) della share SMB: scanner, stabilità, validazione e archivio non cambiano. OneDrive con Graph e flusso client credentials (nessun utente, nessun MFA, token in memoria); il link della cartella si risolve con `/shares`. I caricamenti finiscono in `/data/uploads/<sezione>` e lo scanner li tratta come una cartella locale. |
+| Mappa incidenti in safety.json, non in config.json | Gli eventi crescono nel tempo (fino a 5000); config.json resta piccolo. Il totem riceve solo posizione, data e tipo (niente note, niente persone) e disegna la mappa di calore da sé su canvas, quindi filtri e periodo funzionano offline. Il contatore dei giorni senza infortuni compare solo con una data di inizio della registrazione. |
 | Fase 2 già nel modello | Un dispositivo ha `ruolo` (`totem`/`telefono`). Le API di abbinamento e revoca esistono, ma rispondono 404 finché `globali.fase2` è `false`. |
 
 ## Interfaccia e kiosk

@@ -49,6 +49,7 @@ type viewManifest struct {
 	Contacts    []viewContact    `json:"contacts"`
 	Notices     []viewNotice     `json:"notices"`
 	Screensaver *viewScreensaver `json:"screensaver,omitempty"`
+	Safety      *viewSafety      `json:"safety,omitempty"`
 }
 
 // deviceView costruisce la vista per il dispositivo d a partire dal manifest pubblicato.
@@ -86,6 +87,7 @@ func (s *Server) deviceView(d config.Device, m *scanner.Manifest) viewManifest {
 		ss := cfg.ScreensaverOrDefault()
 		v.Screensaver = &viewScreensaver{Enabled: ss.Attivo, AfterMinutes: ss.DopoMinuti, Night: ss.Notte, NightHours: ss.OrarioNero}
 	}
+	v.Safety = s.safetyView(d, cfg)
 	// hash della vista: contenuto filtrato più dati del reparto (esclusi settings e data)
 	b, _ := json.Marshal(struct {
 		S  []scanner.MSection
@@ -94,7 +96,8 @@ func (s *Server) deviceView(d config.Device, m *scanner.Manifest) viewManifest {
 		C  []viewContact
 		N  []viewNotice
 		Ss *viewScreensaver
-	}{v.Sections, v.Documents, v.Department, v.Contacts, v.Notices, v.Screensaver})
+		Sf *viewSafety
+	}{v.Sections, v.Documents, v.Department, v.Contacts, v.Notices, v.Screensaver, v.Safety})
 	h := sha256.Sum256(b)
 	v.Hash = hex.EncodeToString(h[:])
 	return v

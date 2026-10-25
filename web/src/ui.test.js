@@ -4,6 +4,7 @@ import { screensaverMode } from './kiosk/Screensaver.jsx';
 import { inWindow, shouldApply } from './kiosk/updates.js';
 import { validPath, validUser, checkSource } from './screens/SectionForm.jsx';
 import { validFolder } from './screens/Uploads.jsx';
+import { filterEvents, countByType, daysWithoutInjury } from './heatmap.js';
 import { buildIndex } from './screens/Search.jsx';
 
 const base = { sync: { running: false, progress: null, lastError: null }, deviceError: false, settings: { staleDays: 3 }, meta: { lastSuccess: null, lastError: null } };
@@ -128,5 +129,29 @@ describe('origini dei PDF', () => {
   });
   it('SMB invariato', () => {
     expect(checkSource({ ...base, tipo: 'smb', percorso: '\\\\srv\\sds', utente: 'AZ\\totem' }).ok).toBe(true);
+  });
+});
+
+describe('mappa incidenti', () => {
+  const ev = [
+    { map: 'm1', x: 0.1, y: 0.1, date: '2026-10-20', type: 'infortunio' },
+    { map: 'm1', x: 0.2, y: 0.2, date: '2026-06-01', type: 'quasi' },
+    { map: 'm1', x: 0.3, y: 0.3, date: '2025-01-15', type: 'danno' },
+    { map: 'm2', x: 0.3, y: 0.3, date: '2026-10-01', type: 'medicazione' },
+    { map: 'm1', x: 0.3, y: 0.3, date: '2026-10-30', type: 'quasi' }, // nel futuro (orologio diverso): escluso
+  ];
+  const today = '2026-10-25';
+  it('filtra per planimetria, periodo e tipo', () => {
+    expect(filterEvents(ev, { map: 'm1', period: '3m', today })).toHaveLength(1);
+    expect(filterEvents(ev, { map: 'm1', period: '12m', today })).toHaveLength(2);
+    expect(filterEvents(ev, { map: 'm1', period: 'all', today })).toHaveLength(3);
+    expect(filterEvents(ev, { map: 'm1', period: 'all', types: ['quasi'], today })).toHaveLength(1);
+    expect(countByType(filterEvents(ev, { map: 'm1', period: 'all', today }))).toEqual({ infortunio: 1, medicazione: 0, quasi: 1, danno: 1 });
+  });
+  it('giorni senza infortuni', () => {
+    expect(daysWithoutInjury('2026-10-20', '2026-01-01', today)).toBe(5);
+    expect(daysWithoutInjury('', '2026-10-01', today)).toBe(24);
+    expect(daysWithoutInjury('2025-05-01', '2026-10-01', today)).toBe(24); // infortunio prima dell'inizio
+    expect(daysWithoutInjury('2026-10-20', '', today)).toBe(null);
   });
 });
