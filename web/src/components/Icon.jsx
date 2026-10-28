@@ -37,6 +37,12 @@ const P = {
   adatta: <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />,
   testo: <><path d="M4 18l5-12 5 12M6 14h6" /><path d="M17 9v6M14 12h6" /></>,
   info: <><circle cx="12" cy="12" r="9" /><path d="M12 11v6M12 7.5v.5" /></>,
+  telefono: <path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2" />,
+  riaggancia: <path d="M3 15c5-5 13-5 18 0l-2.5 2.5-3-1.5v-2.5a10 10 0 0 0-7 0V16l-3 1.5z" />,
+  microfono: <><rect x="9" y="2" width="6" height="12" rx="3" /><path d="M5 10a7 7 0 0 0 14 0M12 17v4" /></>,
+  microfonoOff: <><rect x="9" y="2" width="6" height="12" rx="3" /><path d="M5 10a7 7 0 0 0 14 0M12 17v4M3 3l18 18" /></>,
+  campana: <><path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z" /><path d="M10 20a2 2 0 0 0 4 0" /></>,
+  altoparlante: <><path d="M4 9h4l5-4v14l-5-4H4z" /><path d="M16 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12" /></>,
 };
 
 export const SECTION_ICONS = ['documento', 'flacone', 'scudo', 'fiamma', 'croce', 'casco', 'uscita', 'mappa', 'ingranaggio', 'cartella'];

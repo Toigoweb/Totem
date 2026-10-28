@@ -28,7 +28,7 @@ function Steps({ steps, current }) {
   );
 }
 
-export function Wizard() {
+export function Wizard({ code: initialCode }) {
   const [step, setStep] = useState('code');
   const [info, setInfo] = useState(null); // { setupToken, pinSet, sections }
   const [firstPin, setFirstPin] = useState(null);
@@ -78,10 +78,14 @@ export function Wizard() {
       <TopBar left="logo-static" title={S.wizardTitle} right={null} />
       <div class="body">
         {step === 'code' && (
-          <CodeStep steps={steps} onCancel={cancel} onOk={async (d) => {
+          <CodeStep steps={steps} initial={initialCode} onCancel={cancel} onOk={async (d) => {
             // codice di postazione o di un totem aggiuntivo: abbinato subito, resta la sync
             if (d.paired) {
               await markPaired(d.role);
+              if (d.role === 'telefono') {
+                go('home'); // il telefono dell'interfono non scarica documenti
+                return;
+              }
               setInfo({ station: true });
               setStep('sync');
               return;
@@ -103,8 +107,8 @@ export function Wizard() {
   );
 }
 
-function CodeStep({ steps, onOk, onCancel }) {
-  const [code, setCode] = useState('');
+function CodeStep({ steps, onOk, onCancel, initial }) {
+  const [code, setCode] = useState(() => fmtCode(initial || ''));
   const [msg, setMsg] = useState(null);
   const [lockedUntil, setLockedUntil] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -152,6 +156,12 @@ function CodeStep({ steps, onOk, onCancel }) {
       </div>
     </form>
   );
+}
+
+/** "K7QM4XPA" → "K7QM-4XPA" (il codice dal QR arriva senza trattino). */
+export function fmtCode(c) {
+  const n = c.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
+  return n.length > 4 ? `${n.slice(0, 4)}-${n.slice(4)}` : n;
 }
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

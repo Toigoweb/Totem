@@ -119,6 +119,14 @@ export function Home() {
           </div>
         )}
 
+        {s.extras.intercom && s.extras.intercom.enabled && (
+          <button class="sic-home ic-home" data-testid="intercom-open" onClick={() => go('intercom')}>
+            <Icon name="telefono" />
+            <span class="t">{S.icTitle}<small>{S.icOpen}</small></span>
+            <Icon name="avanti" />
+          </button>
+        )}
+
         {safety && safety.maps && safety.maps.length > 0 && (
           <button class="sic-home" data-testid="safety-open" onClick={() => go('safety')}>
             <Icon name="mappa" />

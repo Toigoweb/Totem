@@ -5,6 +5,7 @@ import { visibleDocuments } from './sync/sync.js';
 import { createSyncManager, requestPersistence, detectPlatform } from './sync/manager.js';
 import { api } from './api.js';
 import { daysSince } from './format.js';
+import { wantCall } from './intercom/client.js';
 
 export const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev';
 export const PLATFORM = detectPlatform();
@@ -25,12 +26,12 @@ export const app = createStore({
   history: [],
   sections: [],
   docs: [],
-  extras: { department: null, contacts: [], notices: [], screensaver: null, safety: null },
+  extras: { department: null, contacts: [], notices: [], screensaver: null, safety: null, intercom: null },
   settings: {},
   meta: { lastSuccess: null, lastError: null, syncLog: [] },
   sync: { running: false, progress: null, lastError: null, online: true, nextAt: null },
   paired: null, // null = sconosciuto
-  role: 'totem', // 'totem' | 'postazione'
+  role: 'totem', // 'totem' | 'postazione' | 'telefono'
   deviceError: false,
   maint: null, // { token }
   toast: null,
@@ -40,6 +41,8 @@ export const app = createStore({
   lastInteraction: Date.now(),
   emergency: null, // { id, type, title, text, since } se c'è un'emergenza in corso
   emergencyOpen: false, // a tutto schermo (true) o ridotta alla fascia in basso
+  call: null, // chiamata dell'interfono in corso (intercom/client.js)
+  intercomLive: false, // flusso di eventi dell'interfono aperto
 });
 
 let db;
@@ -84,7 +87,7 @@ export async function reloadData() {
     sections: (sections || []).slice().sort((a, b) => a.order - b.order),
     settings: settings || {},
     docs,
-    extras: { department: null, contacts: [], notices: [], screensaver: null, safety: null, ...(extras || {}) },
+    extras: { department: null, contacts: [], notices: [], screensaver: null, safety: null, intercom: null, ...(extras || {}) },
     meta: { lastSuccess: lastSuccess || null, lastError: lastError || null, syncLog: syncLog || [] },
   });
 }
@@ -219,7 +222,29 @@ export async function init() {
   } catch {
     if (app.get().paired === null) app.set({ paired: false });
   }
-  if (app.get().paired) startSync();
+  // il telefono serve solo all'interfono: niente documenti da scaricare
+  if (app.get().paired && app.get().role !== 'telefono') startSync();
+  openFromUrl();
+}
+
+/**
+ * Parametri dell'indirizzo: ?abbina=CODICE (QR del telefono) apre la procedura guidata con
+ * il codice; ?chiamata=ID[&rispondi=1] arriva da una notifica dell'interfono.
+ */
+function openFromUrl() {
+  // notifica toccata con l'app già aperta: il service worker lo dice alla pagina
+  if (navigator.serviceWorker) {
+    navigator.serviceWorker.addEventListener('message', (e) => {
+      if (e.data && e.data.type === 'chiamata') wantCall(e.data.id, !!e.data.rispondi);
+    });
+  }
+  const q = new URLSearchParams(location.search);
+  const code = q.get('abbina');
+  const callId = q.get('chiamata');
+  if (!code && !callId) return;
+  history.replaceState(null, '', '/');
+  if (code && !app.get().paired) go('wizard', { code: code.slice(0, 12) });
+  if (callId) wantCall(callId, q.get('rispondi') === '1');
 }
 
 export async function markPaired(role = 'totem') {

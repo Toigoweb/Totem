@@ -199,6 +199,7 @@ export async function runSync(o) {
         notices: remote.notices || [],
         screensaver: remote.screensaver || null,
         safety: remote.safety || null,
+        intercom: remote.intercom || null,
       },
       lastSuccess: finishedAt.toISOString(),
       lastAttempt: startedAt.toISOString(),
