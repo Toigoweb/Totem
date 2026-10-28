@@ -50,7 +50,7 @@ raggiungibile da Internet.
    | Campo | Valore |
    |---|---|
    | Domain Names | `totem.azienda.it` |
-   | Scheme / Forward Hostname / Port | `http` / IP del server Docker (o nome del container, se NPM è sulla stessa rete Docker) / `8080` |
+   | Scheme / Forward Hostname / Port | `http` / IP del server Docker (o nome del container, se NPM è sulla stessa rete Docker) / il valore di `TOTEM_PORT` (default `8080`; `8080` se si usa il nome del container) |
    | Access List | `LAN` |
    | Block Common Exploits | attivo |
    | Cache Assets | **disattivato**: `sw.js` e `index.html` non devono essere messi in cache dal proxy, altrimenti gli aggiornamenti dell'app non arrivano |
@@ -61,7 +61,7 @@ raggiungibile da Internet.
 > Il cookie del totem è `Secure`, quindi l'app funziona **solo in HTTPS**, cioè passando
 > da NPM. L'unica eccezione è `http://localhost`, comodo per le prove sul server stesso.
 
-Se NPM gira su un altro host, conviene limitare la porta 8080 del server Docker al solo
+Se NPM gira su un altro host, conviene limitare la porta del totem (`TOTEM_PORT`) al solo
 indirizzo di NPM con il firewall (per esempio con `ufw`).
 
 ### 1.2 Accesso a GHCR (una sola volta)
@@ -71,19 +71,31 @@ echo "<PAT con read:packages>" | docker login ghcr.io -u <utente-github> --passw
 ```
 
 Le credenziali restano in `~/.docker/config.json` dell'utente che esegue `docker compose`.
+Con Portainer il login si fa invece da **Registries** (vedi 1.6).
 
 ### 1.3 Cartelle e compose
 
 ```sh
 sudo mkdir -p /opt/totem && cd /opt/totem
-# copiare qui docker-compose.yml dal repository
+# copiare qui docker-compose.yml dal repository (e, se servono, le variabili: .env)
 sudo mkdir data secrets
 sudo chown -R 65532:65532 data secrets    # il container gira come utente non root 65532
 docker compose up -d
 ```
 
-`docker-compose.yml` è quello del repository e non va modificato. Il filesystem del
-container è in sola lettura; si scrive solo in `./data` e `./secrets`.
+`docker-compose.yml` è quello del repository e non va modificato: le impostazioni
+dell'installazione sono variabili, in un file `.env` accanto al compose (modello in
+[deploy/totem.env.example](deploy/totem.env.example)) oppure nello stack di Portainer.
+
+| Variabile | Default | Uso |
+|---|---|---|
+| `TOTEM_PORT` | `8080` | Porta sul server Docker, quella a cui punta NPM. Accetta anche `indirizzo:porta` (es. `192.168.10.5:8090`) per esporla su una sola scheda di rete. Dentro il container la porta resta 8080. |
+| `TOTEM_DATA_DIR` | `/opt/totem/data` | Cartella dei dati (percorso assoluto) |
+| `TOTEM_SECRETS_DIR` | `/opt/totem/secrets` | Cartella della chiave di cifratura (percorso assoluto) |
+| `TOTEM_TAG` | vuoto | Vuoto = la versione scritta nel compose, aggiornata a ogni rilascio (aggiornamento automatico con Portainer). `1.0.0` = versione bloccata. `1` = ultima 1.x con `docker compose pull`. |
+| `TZ` | `Europe/Rome` | Fuso orario |
+
+Il filesystem del container è in sola lettura; si scrive solo nelle due cartelle.
 
 Se il container si riavvia in continuazione e nei log compare *cartella non scrivibile*,
 mancano i permessi: ripetere il `chown`.
@@ -114,6 +126,52 @@ Copiare `logo.svg` o `logo.png` (massimo 2 MB, sfondo trasparente, chiaro su nav
 `/opt/totem/data/`. Il totem lo scarica al successivo avvio dell'app e lo conserva per
 l'uso offline. Senza logo compare la scritta SICUREZZA.
 
+
+### 1.6 Con Portainer, con aggiornamento automatico
+
+In alternativa ai punti 1.2-1.4, lo stack si crea in Portainer direttamente dal repository
+GitHub privato. Portainer controlla il repository a intervalli regolari e ridistribuisce
+lo stack quando cambia `docker-compose.yml`. A ogni rilascio (tag `vX.Y.Z`) la GitHub
+Action, dopo aver pubblicato l'immagine, aggiorna da sola la versione scritta nel compose:
+così ogni nuova versione arriva sul server senza interventi.
+
+1. **Cartelle sul server Docker** (una volta sola; Portainer non le crea con i permessi
+   giusti):
+   ```sh
+   sudo mkdir -p /opt/totem/data /opt/totem/secrets
+   sudo chown -R 65532:65532 /opt/totem/data /opt/totem/secrets
+   ```
+2. **Token GitHub** (*Settings → Developer settings → Personal access tokens*). Basta un
+   token *classic* con `repo` (lettura del repository privato) e `read:packages`
+   (immagini su GHCR). In alternativa due token separati: uno *fine-grained* con
+   *Contents: Read-only* sul solo repository Totem, più uno *classic* con `read:packages`.
+3. **Registro GHCR**: *Registries → Add registry → Custom registry*, nome `GHCR`, URL
+   `ghcr.io`, *Authentication* attiva, utente GitHub e token con `read:packages`.
+4. **Stack**: *Stacks → Add stack*, nome `totem`, *Build method* **Repository**:
+
+   | Campo | Valore |
+   |---|---|
+   | Repository URL | `https://github.com/Toigoweb/Totem` |
+   | Repository reference | il branch principale, es. `refs/heads/claude/new-session-75lftp` |
+   | Compose path | `docker-compose.yml` |
+   | Authentication | attiva: utente GitHub e token con lettura del repository |
+   | GitOps updates | attivo, *Mechanism* **Polling**, *Fetch interval* `5m` |
+   | Environment variables | `TOTEM_PORT` e, se diverse dal default, le cartelle. **Non** impostare `TOTEM_TAG`, altrimenti la versione resta bloccata |
+
+   *Re-pull image* e *Force redeployment* non servono: a ogni rilascio cambia il tag
+   dell'immagine nel compose, quindi Portainer vede la modifica e scarica l'immagine nuova.
+5. **Deploy the stack**, poi il codice di setup è nei log del container (*Containers →
+   totem → Logs*), come al punto 1.4.
+
+I comandi `docker compose exec totem …` del resto di questo README diventano, sul server,
+`docker exec totem-totem-1 /totem …` (il nome del container è in *Containers*), oppure si
+usa la *Console* del container in Portainer con il comando `/totem …`.
+
+**Aggiornamenti:** il totem si aggiorna entro l'intervallo di polling dal rilascio. Per
+bloccare una versione: variabile `TOTEM_TAG=1.2.3` nello stack. Per tornare indietro: la
+stessa variabile con la versione precedente (si veda anche "Rollback e formato della
+configurazione" al punto 4). Per riprendere gli aggiornamenti automatici: togliere la
+variabile.
 ---
 
 ## 2. Gestione dei PDF sulle share (per chi mantiene i documenti)
@@ -284,21 +342,20 @@ Per provare nuove versioni, nuove sezioni o PDF particolari senza toccare il tot
 reparto conviene un secondo container, completamente separato:
 
 ```sh
-sudo mkdir -p /opt/totem-test && cd /opt/totem-test
-sudo mkdir data secrets && sudo chown -R 65532:65532 data secrets
-cat > docker-compose.yml <<'YAML'
-services:
-  totem:
-    image: ghcr.io/toigoweb/totem:1      # o la versione da provare, per esempio :1.1.0
-    restart: unless-stopped
-    read_only: true
-    ports: ["8081:8080"]
-    volumes: ["./data:/data", "./secrets:/secrets"]
-    environment: ["TZ=Europe/Rome"]
-    logging: { options: { max-size: "10m", max-file: "3" } }
-YAML
+sudo mkdir -p /opt/totem-test/data /opt/totem-test/secrets && cd /opt/totem-test
+sudo chown -R 65532:65532 data secrets
+# stesso docker-compose.yml del repository, con variabili diverse
+cat > .env <<'ENV'
+TOTEM_PORT=8081
+TOTEM_DATA_DIR=/opt/totem-test/data
+TOTEM_SECRETS_DIR=/opt/totem-test/secrets
+#TOTEM_TAG=1.1.0     # per provare una versione precisa
+ENV
 docker compose up -d && docker compose logs totem   # codice di setup dell'istanza di prova
 ```
+
+Con Portainer: un secondo stack (es. `totem-test`) dallo stesso repository, con queste
+variabili.
 
 In NPM aggiungere un secondo proxy host `totem-test.azienda.it` verso la porta `8081`,
 con lo stesso certificato (o uno nuovo) e la stessa access list. L'istanza di prova ha
@@ -395,13 +452,15 @@ curl -H "Authorization: Bearer <token>" "https://totem.azienda.it/api/monitor?fo
 ## 4. Aggiornamento e rollback
 
 Le immagini si pubblicano su `ghcr.io/toigoweb/totem` con i tag `X.Y.Z`, `X.Y` e `X`. Il
-compose usa `:1`, cioè l'ultima versione 1.x.
+compose usa la versione dell'ultimo rilascio, che la GitHub Action aggiorna da sola nel
+repository dopo aver pubblicato l'immagine: con Portainer (1.6) l'aggiornamento è automatico.
 
 | Operazione | Comando o azione |
 |---|---|
-| Aggiornamento | `docker compose pull && docker compose up -d` |
-| Bloccare una versione | Nel compose sostituire `:1` con `:1.2.3` |
-| Rollback | Rimettere il tag precedente (per esempio `:1.2.2`) nel compose e lanciare `docker compose up -d` |
+| Aggiornamento con Portainer | Automatico entro l'intervallo di polling (1.6) |
+| Aggiornamento con docker compose | Copiare il `docker-compose.yml` aggiornato dal repository, poi `docker compose up -d`. Oppure `TOTEM_TAG=1` nel `.env` e `docker compose pull && docker compose up -d` |
+| Bloccare una versione | Variabile `TOTEM_TAG=1.2.3` (`.env` o stack Portainer) |
+| Rollback | `TOTEM_TAG` con la versione precedente (per esempio `1.2.2`), poi *Update the stack* in Portainer o `docker compose up -d` |
 | Pubblicare una versione (sviluppo) | `git tag v1.2.3 && git push origin v1.2.3`: la GitHub Action compila e pubblica |
 | Provare prima una versione nuova | Nell'istanza di prova (vedi «Istanza di prova») impostare il tag nuovo, poi aggiornare il totem |
 | Notifica delle nuove versioni | Facoltativa: Watchtower in modalità solo notifica (`WATCHTOWER_MONITOR_ONLY=true`), che deve poter leggere `~/.docker/config.json` per GHCR |

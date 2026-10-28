@@ -31,13 +31,14 @@
 │       └── sw.js                service worker (Workbox injectManifest, solo shell)
 ├── wireframes/index.html        wireframe statici navigabili (approvati)
 ├── deploy/windows/              watchdog del kiosk Chrome e script di installazione (fase A)
+├── deploy/totem.env.example     variabili dell'installazione (porta, cartelle, versione)
 ├── test/
 │   ├── integration/             test Go con tag `integration` contro Samba
 │   ├── fixtures/genpdf.py       generatore di PDF di prova (SDS con 16 sezioni, generici, troncati)
 │   └── e2e/                     Playwright: Chromium desktop + tablet Android emulato, server Go e Samba
 ├── docs/                        architettura, formati, messa in servizio
 ├── Dockerfile                   node → go → distroless/static:nonroot
-├── docker-compose.yml           l'unico compose di produzione
+├── docker-compose.yml           l'unico compose di produzione (docker compose e Portainer)
 ├── docker-compose.test.yml      Samba + totem per i test di integrazione
 ├── .github/workflows/
 │   ├── ci.yml                   push/PR: go vet, go test, integrazione Samba, npm test, e2e, build immagine

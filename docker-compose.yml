@@ -1,9 +1,29 @@
+# Compose di produzione: lo stesso file per `docker compose` e per uno stack Portainer
+# collegato al repository (aggiornamento automatico). Le impostazioni dell'installazione
+# si passano come variabili (file .env accanto al compose, oppure "Environment variables"
+# dello stack in Portainer): il file non va modificato.
+#
+#   TOTEM_PORT         porta sul server Docker (default 8080). Accetta anche
+#                      indirizzo:porta, per esempio 192.168.10.5:8090
+#   TOTEM_DATA_DIR     cartella dei dati sul server (default /opt/totem/data)
+#   TOTEM_SECRETS_DIR  cartella della chiave di cifratura (default /opt/totem/secrets)
+#   TOTEM_TAG          versione dell'immagine. Vuoto = quella indicata qui sotto, che
+#                      la GitHub Action di rilascio aggiorna a ogni nuova versione:
+#                      Portainer vede il commit e ridistribuisce lo stack da solo.
+#                      Impostarla solo per bloccare una versione (es. 1.0.0) o per
+#                      seguire l'ultima 1.x con "docker compose pull" (TOTEM_TAG=1).
+#   TZ                 fuso orario (default Europe/Rome)
+#
+# I percorsi sono assoluti: con Portainer un percorso relativo finirebbe dentro la
+# copia del repository fatta da Portainer, non sul server.
 services:
   totem:
-    image: ghcr.io/toigoweb/totem:1
+    image: ghcr.io/toigoweb/totem:${TOTEM_TAG:-1.0.0}
     restart: unless-stopped
     read_only: true
-    ports: ["8080:8080"]
-    volumes: ["./data:/data", "./secrets:/secrets"]
-    environment: ["TZ=Europe/Rome"]
+    ports: ["${TOTEM_PORT:-8080}:8080"]
+    volumes:
+      - ${TOTEM_DATA_DIR:-/opt/totem/data}:/data
+      - ${TOTEM_SECRETS_DIR:-/opt/totem/secrets}:/secrets
+    environment: ["TZ=${TZ:-Europe/Rome}"]
     logging: { options: { max-size: "10m", max-file: "3" } }
