@@ -18,7 +18,7 @@
 # copia del repository fatta da Portainer, non sul server.
 services:
   totem:
-    image: ghcr.io/toigoweb/totem:${TOTEM_TAG:-1.1.0}
+    image: ghcr.io/toigoweb/totem:${TOTEM_TAG:-1.1.1}
     restart: unless-stopped
     read_only: true
     ports: ["${TOTEM_PORT:-8080}:8080"]
