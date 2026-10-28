@@ -277,6 +277,8 @@ Le password non compaiono mai nei log.
 |---|---|---|
 | Il container si riavvia, log *cartella non scrivibile* | Permessi di `data` o `secrets` | `sudo chown -R 65532:65532 data secrets` |
 | Il browser dà *403 Forbidden* | Il totem non è in una subnet dell'access list "LAN" | Aggiungere la subnet in NPM |
+| "Serve l'indirizzo HTTPS del totem" (le versioni fino alla 1.0.0 mostravano una pagina bianca) | Aperto in `http://IP:porta`: senza HTTPS il browser non permette cache offline e service worker | Aprire `https://totem.azienda.it` (il proxy host di NPM). Per una prova sul server stesso va bene `http://localhost:<TOTEM_PORT>` |
+| NPM risponde *502 Bad Gateway* | NPM non raggiunge il container | Nel proxy host: *Scheme* `http` (non https); *Forward Hostname* = IP del server Docker (non `localhost`/`127.0.0.1`, che dentro il container di NPM indicano NPM stesso); *Port* = `TOTEM_PORT`. Il nome del container con porta `8080` funziona solo se NPM è sulla stessa rete Docker dello stack. Prova dal server: `curl http://IP-del-server:<TOTEM_PORT>/api/health` |
 | Il totem resta su "Totem non ancora configurato" | Non abbinato | Procedura guidata con il codice dei log |
 | Pillola gialla "Abbinamento da rifare" | Dopo un `reset-pairing`, o con il cookie del browser cancellato | Procedura guidata (codice, PIN attuale). I documenti restano leggibili nel frattempo. |
 | Pillola "Offline – documenti disponibili" | Il totem non raggiunge il server | Rete del totem, DNS, NPM, `docker compose ps` |

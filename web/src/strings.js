@@ -370,6 +370,11 @@ export const S = {
   setupExpired: 'Procedura scaduta: ricomincia dal codice di setup.',
   genericErr: 'Operazione non riuscita. Riprova.',
 
+  // pagina aperta senza HTTPS
+  insecureTitle: 'Serve l\'indirizzo HTTPS del totem',
+  insecureText: (host) => `Questa pagina è aperta in HTTP (${host}). Il totem conserva i documenti per l'uso offline e il browser lo permette solo con una connessione sicura: aprilo con il suo indirizzo https://, quello configurato in Nginx Proxy Manager (per esempio https://totem.azienda.it).`,
+  insecureHelp: 'Per una prova sul server stesso funziona anche http://localhost.',
+
   // mappa incidenti
   safetyTitle: 'Situazione sicurezza',
   safetyOpen: 'Mappa degli incidenti',
