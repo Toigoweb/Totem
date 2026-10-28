@@ -90,8 +90,11 @@ jobs:
         run: |
           $pw = ConvertTo-SecureString 'Kx7#pQ2!wZ9m-Lr4' -AsPlainText -Force
           New-LocalUser -Name totem -Password $pw -PasswordNeverExpires | Out-Null
-          powershell -NoProfile -ExecutionPolicy Bypass -File deploy/windows/installa-kiosk.ps1 -Url https://totem.example.invalid/ -Utente totem -TokenAgente token-di-prova
+          powershell -NoProfile -ExecutionPolicy Bypass -File deploy/windows/installa-kiosk.ps1 -Url https://totem.example.invalid/ -Utente totem -TokenAgente token-di-prova -Interfono
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $mic = (Get-ItemProperty 'HKLM:\SOFTWARE\Policies\Google\Chrome\AudioCaptureAllowedUrls').'1'
+          if ($mic -ne 'https://totem.example.invalid') { throw "criterio del microfono errato: $mic" }
+          if (Test-Path 'HKLM:\SOFTWARE\Policies\Google\Chrome\VideoCaptureAllowedUrls') { throw 'la webcam non va mai consentita' }
           $t = Get-ScheduledTask -TaskName 'Totem - kiosk', 'Totem - riavvio notturno browser', 'Totem - agente'
           $t | Format-Table TaskName, State, @{n='Utente';e={$_.Principal.UserId}}
           if ($t.Count -ne 3) { throw 'attività pianificate mancanti' }

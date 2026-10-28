@@ -97,6 +97,9 @@
 | Inattività durante la procedura guidata | Non riporta alla Home | Un tecnico non deve perdere la messa in servizio a metà. |
 | Inattività in manutenzione | 10 minuti (fuori dalla manutenzione 3) | Coerente con la fascia gialla "uscita automatica dopo 10 minuti" e con la scadenza del token sul server. |
 | Blocco del PIN | Globale, non per indirizzo IP | In LAN gli indirizzi si cambiano facilmente. |
+| Interfono: audio | WebRTC diretto tra i browser, senza STUN/TURN | Totem e telefoni sono nella stessa rete interna: nessun servizio esterno e nessun audio sul server. Il server fa solo la segnalazione (SSE + POST). |
+| Interfono: telefoni | Solo Android con Chrome, notifiche Web Push (VAPID, aes128gcm) implementate senza librerie | Su iPhone le notifiche di una PWA sono limitate. Il codice delle notifiche è piccolo e provato con il vettore di RFC 8291. |
+| Interfono spento | Nessun campo nel manifest, API 404 | Chi non lo usa non vede pulsanti, non apre connessioni e non concede il microfono. |
 
 ## Nomi di file da tenere distinti
 

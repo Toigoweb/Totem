@@ -164,6 +164,11 @@ Configurazione computer → Modelli amministrativi (questi valgono per tutto il 
 6. ☐ Riattaccare la rete e controllare che la pillola torni "Aggiornato alle …".
 7. ☐ Sul server `cat /opt/totem/data/state/heartbeat.json` mostra `"platform": "windows"`
    e l'ora dell'ultimo contatto.
+8. ☐ Solo se si usa l'**interfono** (README, "Interfono"): kiosk installato con
+   `-Interfono`, microfono e altoparlante collegati, in `chrome://policy` il criterio
+   `AudioCaptureAllowedUrls` con l'indirizzo del totem. Chiamata di prova verso una
+   postazione o un telefono e ritorno; da totem e telefono su reti diverse, verificare che
+   il firewall lasci passare l'UDP tra le due.
 
 ### A8. Uscire dal kiosk per manutenzione
 

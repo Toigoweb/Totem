@@ -649,6 +649,71 @@ il riavvio da remoto no.
 rete dei totem e, con il firewall, permettere la porta 8080 del tablet **solo
 dall'IP del server Docker**. Non esporla mai su Internet.
 
+### Interfono
+
+Chiamate a voce tra totem, postazioni e telefoni Android dei colleghi, dentro la rete
+aziendale. **Spento di default**: finché non lo si accende non compare nessun pulsante,
+nessun dispositivo apre connessioni per l'interfono e nessuno chiede il microfono.
+
+**Come funziona.** Il server fa solo da centralino: sa chi è collegato e passa ai due
+dispositivi i dati per collegarsi (WebRTC). La voce va **direttamente** tra i due
+dispositivi in rete interna, cifrata; non passa dal server né da Internet e **non viene
+registrata**. Si chiama:
+- un **ruolo** (primo soccorso, portineria, capo reparto…): squilla su tutti i suoi
+  membri disponibili, risponde il primo; agli altri smette di squillare;
+- un **totem o una postazione**: risponde chi è vicino;
+- un **telefono**.
+
+Si risponde solo toccando *Rispondi*. Senza risposta entro 30 secondi la chiamata si chiude
+e chi ha chiamato vede il numero da chiamare al posto (quello del ruolo o del dispositivo).
+Solo voce: niente video.
+
+**Accensione** (Manutenzione → *Interfono*):
+1. *Interfono attivo* → Sì.
+2. Accendere l'interfono sui dispositivi con microfono e altoparlante, ciascuno con un
+   numero di ripiego facoltativo.
+3. Creare i ruoli e sceglierne i membri, poi *Salva*.
+4. Telefoni: *Abbina un telefono*, con un nome che dica il ruolo («Telefono primo
+   soccorso») più che la persona. Il totem mostra un **codice QR** e un codice da 8
+   caratteri, validi 10 minuti.
+
+**Telefono** (solo Android con Chrome, collegato al Wi-Fi aziendale):
+1. Installare il certificato della CA interna (come per i tablet, sotto).
+2. Inquadrare il QR con la fotocamera: si apre il totem con il codice già scritto →
+   *Avanti*. In alternativa aprire l'indirizzo del totem e inserire il codice.
+3. *Attiva le notifiche* e consentire notifiche e microfono: così il telefono squilla anche
+   con l'app chiusa o lo schermo spento (con *Rispondi* e *Rifiuta* nella notifica).
+4. Menu di Chrome → *Aggiungi a schermata Home*, per aprirlo come un'app.
+5. L'interruttore *Disponibile* si spegne a fine turno: il telefono non riceve chiamate.
+
+Il telefono abbinato all'interfono non scarica i documenti e non entra in manutenzione.
+
+**Totem e postazioni Windows**: reinstallare il kiosk con `-Interfono`
+(`installa-kiosk.ps1 -Url … -Interfono`): un criterio di Chrome consente il microfono e
+la suoneria al solo indirizzo del totem, senza richieste a schermo (la webcam mai). Serve
+un microfono (meglio un vivavoce USB con cancellazione dell'eco).
+**Tablet con FreeKiosk**: FreeKiosk deve avere il permesso del microfono (*Impostazioni →
+App → FreeKiosk → Autorizzazioni → Microfono*). Fare una chiamata di prova: senza permesso
+la chiamata si chiude con «Microfono non disponibile o non consentito».
+
+**Rete.**
+- I dispositivi devono raggiungersi **direttamente** (UDP) nella rete interna: con totem e
+  telefoni su VLAN diverse, il firewall deve lasciar passare il traffico tra le due.
+  Non c'è un server di appoggio (TURN): se non si raggiungono, la chiamata si chiude con
+  «Audio non collegato».
+- Le **notifiche** ai telefoni passano dal servizio di Google (FCM), che vede solo un
+  contenuto cifrato: il **server** deve poter uscire su HTTPS verso
+  `fcm.googleapis.com` (anche tramite proxy: variabile `HTTPS_PROXY` del container). Senza,
+  i telefoni squillano solo con l'app aperta.
+- Le chiavi delle notifiche sono in `/secrets/vapid.key` (create al primo avvio, da
+  includere nel backup: se si perdono, i telefoni devono riattivare le notifiche).
+- Con Nginx Proxy Manager non serve nulla di particolare: il flusso di eventi
+  (`/api/intercom/events`) disattiva da sé il buffering.
+
+**Privacy.** Il server tiene in memoria solo le chiamate in corso: nessuna cronologia,
+nessuna registrazione. Nei log restano solo inizio chiamata, dispositivi e numero di
+dispositivi su cui ha squillato. Il telefono non manda mai la posizione.
+
 ---
 
 ## 4. Aggiornamento e rollback

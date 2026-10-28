@@ -3,6 +3,7 @@
 
     powershell -ExecutionPolicy Bypass -File installa-kiosk.ps1 -Url https://totem.azienda.it -Utente totem
     (facoltativo, per il monitoraggio del PC)  -TokenAgente <token>
+    (facoltativo, per l'interfono)             -Interfono
 
   Fa:
     - copia il watchdog in C:\TotemKiosk
@@ -12,6 +13,8 @@
     - con -TokenAgente: agente del PC (stato, comandi, schermo di notte, annuncio vocale
       di emergenza), token in C:\TotemKiosk\agente.token leggibile solo dall'utente del
       totem e dagli amministratori. Il token si genera in Manutenzione → Dispositivi → PC
+    - con -Interfono: criteri di Chrome che consentono al solo indirizzo del totem il
+      microfono senza richiesta (mai la webcam) e la suoneria senza un tocco prima
   Non fa (vedi docs/04-messa-in-servizio.md): creazione dell'utente, Autologon,
   criteri di gruppo, Windows Update.
 #>
@@ -19,7 +22,8 @@ param(
   [Parameter(Mandatory = $true)][string]$Url,
   [string]$Utente = 'totem',
   [string]$OraRiavvio = '03:30',
-  [string]$TokenAgente = ''
+  [string]$TokenAgente = '',
+  [switch]$Interfono
 )
 
 $ErrorActionPreference = 'Stop'
@@ -62,7 +66,18 @@ if ($TokenAgente) {
   Write-Host "Agente del PC installato: compare in Manutenzione → Dispositivi entro un minuto dall'accesso."
 }
 
-# 4) alimentazione (rete elettrica)
+# 4) interfono (facoltativo): microfono e suoneria per il solo indirizzo del totem
+if ($Interfono) {
+  $origin = $Url -replace '^(https?://[^/]+).*$', '$1'
+  foreach ($k in 'AudioCaptureAllowedUrls', 'AutoplayAllowlist') {
+    $key = "HKLM:\SOFTWARE\Policies\Google\Chrome\$k"
+    New-Item -Path $key -Force | Out-Null
+    New-ItemProperty -Path $key -Name '1' -Value $origin -PropertyType String -Force | Out-Null
+  }
+  Write-Host "Interfono: microfono e suoneria consentiti a $origin (verificare in chrome://policy)."
+}
+
+# 5) alimentazione (rete elettrica)
 powercfg /change standby-timeout-ac 0
 powercfg /change hibernate-timeout-ac 0
 powercfg /change monitor-timeout-ac 0

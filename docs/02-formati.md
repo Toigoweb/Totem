@@ -164,6 +164,7 @@ sync) sta in `/data/state/heartbeat.json`, per non riscrivere config.json a ogni
 /data/safety.json            mappa incidenti: planimetrie ed eventi
 /data/maps/<sha256>          immagini delle planimetrie (PNG o JPEG)
 /secrets/key                 32 byte casuali, permessi 0600
+/secrets/vapid.key           chiave privata delle notifiche push dell'interfono (base64url)
 ```
 
 ## Novità della schemaVersion 2 di config.json
@@ -322,4 +323,50 @@ Il segnale periodico dell'app (`POST /api/heartbeat`) porta in più, facoltativi
 `battery` (`{ "level": 0-100, "charging": bool }`, solo se il dispositivo ha una batteria),
 `browser` (es. "Chrome 131") e `view` (es. "Documento: Acetone"). I comandi all'app
 (`ricarica`, `home`, `sincronizza`) arrivano nel campo `commands` di `GET /api/emergency`.
+
+## Interfono
+
+In `globali` (spento di default; con `attivo: false` le API rispondono 404):
+
+```json
+"interfono": {
+  "attivo": true,
+  "gruppi": [{ "id": "ig_x1", "nome": "Primo soccorso", "numero": "3210", "membri": ["d_a1", "d_t9"] }]
+}
+```
+
+Per dispositivo (assente = interfono spento sul dispositivo):
+
+```json
+"interfono": { "attivo": true, "disponibile": true, "numero": "201",
+  "push": { "endpoint": "https://fcm.googleapis.com/fcm/send/…", "p256dh": "B…", "auth": "…" } }
+```
+
+`disponibile` vale per i telefoni (interruttore sul telefono). `push` è la sottoscrizione
+Web Push del telefono; si toglie da sola quando il servizio risponde 404/410.
+
+Il manifest del dispositivo ha `"intercom": { "enabled": true }` solo se l'interfono è
+attivo sia in generale sia sul dispositivo; altrimenti il campo manca e l'hash della vista
+resta quello di prima.
+
+API per i dispositivi (cookie del dispositivo):
+
+| Metodo e percorso | Uso |
+|---|---|
+| `GET /api/intercom/events` | flusso di eventi (SSE): `incoming`, `accepted`, `signal`, `ended` |
+| `GET /api/intercom/directory` | ruoli (con disponibili), dispositivi raggiungibili, chiave VAPID |
+| `POST /api/intercom/calls` | `{ "target": "group:<id>" \| "device:<id>" }` |
+| `POST /api/intercom/calls/{id}/answer\|reject\|hangup` | risposta, rifiuto, fine |
+| `POST /api/intercom/calls/{id}/signal` | offerta/risposta SDP e candidati ICE, inoltrati all'altra parte |
+| `PUT /api/intercom/me` | `{ "disponibile": bool, "push": <PushSubscription> \| null }` |
+
+Esempio di evento: `data: {"type":"ended","callId":"ch_x","reason":"noanswer","call":{…,"number":"3210"}}`.
+`reason`: `hangup`, `rejected`, `noanswer` (30 s), `elsewhere` (ha risposto un altro membro),
+`offline`. Le notifiche push al telefono contengono `{"tipo":"chiamata","id","da","verso"}`
+o `{"tipo":"fine","id"}`, cifrate (RFC 8291) con TTL 30 s.
+
+Manutenzione: `GET/PUT /api/maint/intercom`, `PUT /api/maint/devices/{id}/intercom`
+(`{ "attivo", "numero" }`), `POST /api/maint/intercom/phone-code` (`{ "nome" }` →
+`code`, `path` = `/?abbina=<codice>` per il QR). Il codice del telefono si usa nella
+procedura guidata (`POST /api/setup/code`), come quello delle postazioni.
 
