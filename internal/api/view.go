@@ -50,6 +50,12 @@ type viewManifest struct {
 	Notices     []viewNotice     `json:"notices"`
 	Screensaver *viewScreensaver `json:"screensaver,omitempty"`
 	Safety      *viewSafety      `json:"safety,omitempty"`
+	// presente solo con l'interfono attivo per il dispositivo
+	Intercom *viewIntercom `json:"intercom,omitempty"`
+}
+
+type viewIntercom struct {
+	Enabled bool `json:"enabled"`
 }
 
 // deviceView costruisce la vista per il dispositivo d a partire dal manifest pubblicato.
@@ -88,6 +94,9 @@ func (s *Server) deviceView(d config.Device, m *scanner.Manifest) viewManifest {
 		v.Screensaver = &viewScreensaver{Enabled: ss.Attivo, AfterMinutes: ss.DopoMinuti, Night: ss.Notte, NightHours: ss.OrarioNero}
 	}
 	v.Safety = s.safetyView(d, cfg)
+	if s.o.Intercom != nil && cfg.IntercomOn(d) {
+		v.Intercom = &viewIntercom{Enabled: true}
+	}
 	// hash della vista: contenuto filtrato più dati del reparto (esclusi settings e data)
 	b, _ := json.Marshal(struct {
 		S  []scanner.MSection
@@ -97,7 +106,8 @@ func (s *Server) deviceView(d config.Device, m *scanner.Manifest) viewManifest {
 		N  []viewNotice
 		Ss *viewScreensaver
 		Sf *viewSafety
-	}{v.Sections, v.Documents, v.Department, v.Contacts, v.Notices, v.Screensaver, v.Safety})
+		In *viewIntercom `json:",omitempty"` // assente: hash uguale a prima dell'interfono
+	}{v.Sections, v.Documents, v.Department, v.Contacts, v.Notices, v.Screensaver, v.Safety, v.Intercom})
 	h := sha256.Sum256(b)
 	v.Hash = hex.EncodeToString(h[:])
 	return v

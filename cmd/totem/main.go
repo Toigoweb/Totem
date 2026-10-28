@@ -37,12 +37,14 @@ import (
 	"github.com/toigoweb/totem/internal/config"
 	"github.com/toigoweb/totem/internal/emergency"
 	"github.com/toigoweb/totem/internal/graphsrc"
+	"github.com/toigoweb/totem/internal/intercom"
 	"github.com/toigoweb/totem/internal/kiosk"
 	"github.com/toigoweb/totem/internal/pcagent"
 	"github.com/toigoweb/totem/internal/safety"
 	"github.com/toigoweb/totem/internal/scanner"
 	"github.com/toigoweb/totem/internal/synclog"
 	"github.com/toigoweb/totem/internal/version"
+	"github.com/toigoweb/totem/internal/webpush"
 	"github.com/toigoweb/totem/web"
 )
 
@@ -173,8 +175,17 @@ func serve() int {
 		logger.Warn("EMERGENZA IN CORSO (avviata prima del riavvio)", "testo", em.Get().Testo)
 	}
 	km := kiosk.New(kiosk.Options{Config: store, Cipher: ci, Logger: logger, EmergencyActive: em.Active})
+	// interfono: le chiavi VAPID per le notifiche ai telefoni stanno con gli altri segreti
+	var push *webpush.Sender
+	if keys, err := webpush.LoadOrCreateKeys(filepath.Join(secretsDir, "vapid.key")); err != nil {
+		logger.Warn("interfono: notifiche push non disponibili", "err", err)
+	} else {
+		push = &webpush.Sender{Keys: keys, HTTP: &http.Client{Timeout: 10 * time.Second}}
+	}
 	srv := api.New(api.Options{Config: store, Cipher: ci, Scanner: sc, Log: syncLog, Settings: settings, DataDir: dataDir,
-		Safety: saf, Kiosk: km, Emergency: em, Agents: pcagent.New(nil, logger), Static: web.Dist(), Version: version.Version, Logger: logger})
+		Safety: saf, Kiosk: km, Emergency: em, Agents: pcagent.New(nil, logger), Intercom: intercom.New(), Push: push,
+		Static: web.Dist(), Version: version.Version, Logger: logger})
+	srv.IntercomHooks()
 	srv.EnsureSetupCode()
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

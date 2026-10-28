@@ -17,12 +17,14 @@ import (
 	"github.com/toigoweb/totem/internal/auth"
 	"github.com/toigoweb/totem/internal/config"
 	"github.com/toigoweb/totem/internal/emergency"
+	"github.com/toigoweb/totem/internal/intercom"
 	"github.com/toigoweb/totem/internal/kiosk"
 	"github.com/toigoweb/totem/internal/pcagent"
 	"github.com/toigoweb/totem/internal/safety"
 	"github.com/toigoweb/totem/internal/scanner"
 	"github.com/toigoweb/totem/internal/smbsrc"
 	"github.com/toigoweb/totem/internal/synclog"
+	"github.com/toigoweb/totem/internal/webpush"
 )
 
 const (
@@ -56,6 +58,8 @@ type Options struct {
 	Kiosk     *kiosk.Manager
 	Emergency *emergency.Store
 	Agents    *pcagent.Manager // agenti dei PC Windows (facoltativo)
+	Intercom  *intercom.Hub    // interfono (facoltativo)
+	Push      *webpush.Sender  // notifiche push ai telefoni (facoltativo)
 	Static    fs.FS            // contenuto di web/dist
 	Version   string
 	Logger    *slog.Logger
@@ -196,6 +200,17 @@ func (s *Server) Handler() http.Handler {
 	m.Handle("POST /api/maint/safety/events", s.maintOnly(http.HandlerFunc(s.putSafetyEvent)))
 	m.Handle("PUT /api/maint/safety/events/{id}", s.maintOnly(http.HandlerFunc(s.putSafetyEvent)))
 	m.Handle("DELETE /api/maint/safety/events/{id}", s.maintOnly(http.HandlerFunc(s.deleteSafetyEvent)))
+
+	// interfono (404 finché è spento, globalmente o per il dispositivo)
+	m.Handle("GET /api/intercom/events", s.intercomDevice(s.intercomEvents))
+	m.Handle("GET /api/intercom/directory", s.intercomDevice(s.intercomDirectory))
+	m.Handle("POST /api/intercom/calls", s.intercomDevice(s.intercomCall))
+	m.Handle("POST /api/intercom/calls/{id}/{azione}", s.intercomDevice(s.intercomAction))
+	m.Handle("PUT /api/intercom/me", s.intercomDevice(s.intercomMe))
+	m.Handle("GET /api/maint/intercom", s.maintOnly(http.HandlerFunc(s.maintIntercom)))
+	m.Handle("PUT /api/maint/intercom", s.maintOnly(http.HandlerFunc(s.putMaintIntercom)))
+	m.Handle("PUT /api/maint/devices/{id}/intercom", s.maintOnly(http.HandlerFunc(s.putDeviceIntercom)))
+	m.Handle("POST /api/maint/intercom/phone-code", s.maintOnly(http.HandlerFunc(s.phoneIntercomCode)))
 
 	// fase 2: telefoni (404 finché globali.fase2 è false)
 	m.Handle("POST /api/maint/devices/pair-code", s.phase2(s.maintOnly(http.HandlerFunc(s.pairCode))))

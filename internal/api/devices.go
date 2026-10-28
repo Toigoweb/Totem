@@ -25,6 +25,10 @@ import (
 //   - Telefono (fase 2): codice monouso valido 2 minuti mostrato dal totem come QR.
 //     Le API rispondono 404 finché globali.fase2 è false.
 
+// roleIntercomPhone: codice di un telefono per l'interfono (si usa nella procedura
+// guidata, diverso dai codici dei telefoni di fase 2 che passano da POST /api/pair).
+const roleIntercomPhone = "telefono-interfono"
+
 const (
 	stationCodeTTL = 10 * time.Minute
 	phoneCodeTTL   = 2 * time.Minute
@@ -81,8 +85,15 @@ func (s *Server) registerDevice(w http.ResponseWriter, role, name, platform stri
 func (s *Server) registerGrant(w http.ResponseWriter, g pairGrant, platform string) (config.Device, error) {
 	tok := auth.NewToken()
 	now := s.o.Now().UTC()
+	intercomOn := g.role == roleIntercomPhone
+	if intercomOn {
+		g.role = RolePhone
+	}
 	dev := config.Device{ID: auth.NewID("d"), Nome: g.name, Ruolo: g.role, Reparto: g.reparto, Piattaforma: validPlatform(platform),
 		TokenHash: auth.HashToken(tok), Creato: now, UltimoContatto: now}
+	if intercomOn {
+		dev.Interfono = &config.DeviceIntercom{Attivo: true, Disponibile: true}
+	}
 	if err := s.o.Config.Update(func(c *config.Config) error {
 		if _, ok := c.Department(dev.Reparto); !ok {
 			dev.Reparto = "" // reparto eliminato nel frattempo
@@ -137,13 +148,18 @@ func (s *Server) StationCode(nome string) string {
 }
 
 // pairByCode è chiamata dalla procedura guidata quando il codice inserito è un codice di
-// postazione o di un nuovo totem. Restituisce true se ha risposto.
+// postazione, di un nuovo totem o di un telefono per l'interfono. Restituisce true se ha
+// risposto.
 func (s *Server) pairByCode(w http.ResponseWriter, code, platform string) bool {
-	g, ok := s.takePairCode(code, RoleStation)
-	if !ok {
-		if g, ok = s.takePairCode(code, RoleTotem); !ok {
-			return false
+	var g pairGrant
+	ok := false
+	for _, role := range []string{RoleStation, RoleTotem, roleIntercomPhone} {
+		if g, ok = s.takePairCode(code, role); ok {
+			break
 		}
+	}
+	if !ok {
+		return false
 	}
 	s.codeLimiter.Success()
 	dev, err := s.registerGrant(w, g, platform)

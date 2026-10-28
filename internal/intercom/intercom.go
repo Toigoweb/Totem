@@ -78,7 +78,17 @@ type Hub struct {
 	// OnRing è chiamata (fuori dal lock) per i dispositivi che devono squillare: il
 	// livello API manda le notifiche push ai telefoni.
 	OnRing func(c Call, devices []string)
+	// OnStop è chiamata (in background) per i dispositivi che hanno smesso di squillare
+	// senza rispondere: toglie la notifica dai telefoni.
+	OnStop func(callID string, devices []string)
 	Now    func() time.Time
+}
+
+// stopped va chiamata con il lock preso.
+func (h *Hub) stopped(id string, devs []string) {
+	if h.OnStop != nil && len(devs) > 0 {
+		go h.OnStop(id, devs)
+	}
 }
 
 func New() *Hub {
@@ -203,11 +213,14 @@ func (h *Hub) end(c *Call, reason, skip string) {
 		}
 		h.send(c.From.ID, ev)
 	}
+	var stop []string
 	for t := range c.ringing {
 		if t != skip {
 			h.send(t, e)
 		}
+		stop = append(stop, t)
 	}
+	h.stopped(c.ID, stop)
 	if c.By != nil && c.By.ID != skip {
 		h.send(c.By.ID, e)
 	}
@@ -229,11 +242,14 @@ func (h *Hub) Answer(id string, by Party) (Call, error) {
 		c.timer.Stop()
 	}
 	c.State, c.By = StateActive, &by
+	var stop []string
 	for t := range c.ringing {
 		if t != by.ID {
 			h.send(t, Event{Type: "ended", CallID: c.ID, Reason: EndElsewhere})
+			stop = append(stop, t)
 		}
 	}
+	h.stopped(c.ID, stop)
 	c.ringing = map[string]bool{}
 	cp := *c
 	h.send(c.From.ID, Event{Type: "accepted", Call: &cp})
@@ -252,6 +268,7 @@ func (h *Hub) Reject(id, dev string) error {
 		return ErrState
 	}
 	delete(c.ringing, dev)
+	h.stopped(c.ID, []string{dev})
 	if len(c.ringing) == 0 {
 		h.end(c, EndRejected, dev)
 	}
