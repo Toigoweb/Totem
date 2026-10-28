@@ -122,6 +122,7 @@ test('tablet FreeKiosk: collegamento, stato, comandi, screenshot e annuncio di e
     await page.getByTestId('device-row').first().getByTestId('open-tablet').click();
     await expect(page.getByTestId('device-control')).toBeVisible();
     // su un PC (profilo desktop) la sezione del tablet si apre a mano; su Android c'è già
+    await expect(page.getByTestId('ctl-app')).toBeVisible(); // dispositivo caricato
     if (await page.getByTestId('show-tablet').count()) await page.getByTestId('show-tablet').click();
     await expect(page.getByTestId('kiosk-device')).toBeVisible();
     await page.fill('#k-addr', 'http://x');

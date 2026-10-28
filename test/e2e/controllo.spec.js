@@ -63,7 +63,8 @@ test('controllo: comandi all\'app e agente del PC Windows', async ({ page, brows
   // agente del PC del totem
   await page.getByTestId('back').click();
   await page.getByTestId('device-row').filter({ hasText: 'totem' }).first().getByTestId('open-tablet').click();
-  // su Android la sezione del PC si apre a mano
+  // su Android la sezione del PC si apre a mano (dopo il caricamento del dispositivo)
+  await expect(page.getByTestId('ctl-app')).toBeVisible();
   if (await page.getByTestId('show-pc').count()) await page.getByTestId('show-pc').click();
   await expect(page.getByTestId('ctl-pc')).toContainText('Agente non collegato');
   await page.getByTestId('pc-token-new').click();
