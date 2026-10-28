@@ -142,7 +142,8 @@ jobs:
           foreach ($i in 1, 2) {
             powershell -NoProfile -ExecutionPolicy Bypass -File C:\TotemKiosk\totem-agente.ps1 -Server http://127.0.0.1:18080 -Once -LogFile "$d\agente.log"
           }
-          $mon = Invoke-RestMethod http://127.0.0.1:18081/internal/monitor
+          # con un problema il monitoraggio risponde 503: si legge comunque il corpo
+          try { $mon = Invoke-RestMethod http://127.0.0.1:18081/internal/monitor } catch { $mon = $_.ErrorDetails.Message | ConvertFrom-Json }
           $mon.pcs | Format-Table device, code, text
           Get-Content "$d\agente.log" -ErrorAction SilentlyContinue
           if (-not ($mon.pcs | Where-Object { $_.code -eq 'chrome' })) { Get-Content "$d\server.log"; throw 'stato del PC non arrivato al server' }
