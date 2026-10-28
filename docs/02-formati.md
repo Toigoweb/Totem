@@ -160,6 +160,7 @@ sync) sta in `/data/state/heartbeat.json`, per non riscrivere config.json a ogni
 /data/blobs/tmp/             download in corso, ripuliti all'avvio
 /data/logs/sync.log          log JSON per riga, rotazione a 5 MB × 5 file
 /data/uploads/<sezione>/     PDF caricati direttamente (sezioni di tipo upload)
+/data/emergency.json         emergenza in corso (o l'ultima terminata)
 /data/safety.json            mappa incidenti: planimetrie ed eventi
 /data/maps/<sha256>          immagini delle planimetrie (PNG o JPEG)
 /secrets/key                 32 byte casuali, permessi 0600
@@ -251,4 +252,41 @@ Nel manifest di ogni dispositivo, se ha almeno una planimetria visibile:
 Vanno al totem solo gli eventi degli ultimi 3 anni; `lastInjury` considera anche quelli più
 vecchi. Le immagini si scaricano da `GET /api/maps/<sha256>` (cookie del dispositivo), con
 verifica SHA-256, e restano in Cache Storage come i PDF.
+
+## Tablet con FreeKiosk e emergenza
+
+Un dispositivo in `globali.dispositivi[]` può avere il tablet collegato:
+
+```json
+"kiosk": {
+  "tipo": "freekiosk",
+  "indirizzo": "192.168.2.60:8080",
+  "chiave": "v1:…(chiave API cifrata, associated data \"kiosk:<id del dispositivo>\")",
+  "schermoNotte": true,
+  "luminositaAuto": true,
+  "posizione": [0.02, 9.79, 0.31]
+}
+```
+
+`posizione` è il vettore di gravità di riferimento (primo controllo o "Posizione attuale
+come riferimento"). Il token per avviare l'emergenza da sistemi esterni è in
+`globali.emergenza.tokenHash` (SHA-256, come quello del monitoraggio).
+
+`/data/emergency.json`:
+
+```json
+{ "attiva": true, "id": "em_k3v9q2", "tipo": "evacuazione", "testo": "Lasciare l'edificio…",
+  "avviata": "2026-10-28T09:12:00Z", "da": "totem magazzino" }
+```
+
+`tipo`: `evacuazione` (testo predefinito se vuoto) o `avviso` (testo obbligatorio), massimo
+200 caratteri. I dispositivi leggono `GET /api/emergency`:
+
+```json
+{ "active": true, "id": "em_k3v9q2", "type": "evacuazione", "title": "Evacuazione",
+  "text": "Lasciare l'edificio…", "since": "2026-10-28T09:12:00Z" }
+```
+
+e lo conservano in IndexedDB (`meta.emergency`). Non passa dal manifest: deve arrivare in
+pochi secondi, non alla sync successiva.
 

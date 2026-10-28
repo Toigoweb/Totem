@@ -38,6 +38,8 @@ export const app = createStore({
   persist: 'unsupported',
   serverVersion: null,
   lastInteraction: Date.now(),
+  emergency: null, // { id, type, title, text, since } se c'è un'emergenza in corso
+  emergencyOpen: false, // a tutto schermo (true) o ridotta alla fascia in basso
 });
 
 let db;

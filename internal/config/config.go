@@ -83,6 +83,7 @@ type Globals struct {
 	Avvisi       []Notice    `json:"avvisi"`
 	Salvaschermo Screensaver `json:"salvaschermo"`
 	Monitor      Monitor     `json:"monitor"`
+	Emergenza    Emergency   `json:"emergenza"`
 }
 
 // Department è un reparto: un gruppo di totem che vede solo alcune sezioni.
@@ -136,6 +137,28 @@ type Device struct {
 	TokenHash      string    `json:"tokenHash"`
 	Creato         time.Time `json:"creato"`
 	UltimoContatto time.Time `json:"ultimoContatto,omitempty"`
+	// Kiosk: app kiosk del tablet controllabile dal server (oggi solo FreeKiosk).
+	Kiosk *Kiosk `json:"kiosk,omitempty"`
+}
+
+// Kiosk collega un dispositivo all'API REST dell'app kiosk che lo ospita.
+type Kiosk struct {
+	Tipo      string `json:"tipo"`      // "freekiosk"
+	Indirizzo string `json:"indirizzo"` // host:porta in LAN, es. 192.168.2.60:8080
+	// Chiave API cifrata come le password delle sezioni (associated data "kiosk:<id>").
+	Chiave         string `json:"chiave,omitempty"`
+	SchermoNotte   bool   `json:"schermoNotte"`   // spegne lo schermo nell'orario notturno
+	LuminositaAuto bool   `json:"luminositaAuto"` // luminosità dal sensore di luce
+	// Posizione: vettore di gravità di riferimento, per l'avviso "tablet spostato".
+	Posizione *[3]float64 `json:"posizione,omitempty"`
+}
+
+// KioskKeyID è l'associated data della chiave API cifrata di un dispositivo.
+func KioskKeyID(deviceID string) string { return "kiosk:" + deviceID }
+
+// Emergency: accesso all'avvio dell'emergenza da sistemi esterni (centrale, pulsante).
+type Emergency struct {
+	TokenHash string `json:"tokenHash,omitempty"`
 }
 
 // Clone restituisce una copia profonda, così chi legge non vede scritture concorrenti.

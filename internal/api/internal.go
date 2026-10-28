@@ -39,5 +39,25 @@ func (s *Server) InternalHandler() http.Handler {
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"setupCode": code})
 	})
+	m.HandleFunc("POST /internal/emergency/start", func(w http.ResponseWriter, r *http.Request) {
+		tipo := r.URL.Query().Get("tipo")
+		if tipo == "" {
+			tipo = "evacuazione"
+		}
+		st, err := s.StartEmergency(tipo, r.URL.Query().Get("testo"), "server")
+		if err != nil {
+			validationResponse(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, emergencyView(st))
+	})
+	m.HandleFunc("POST /internal/emergency/stop", func(w http.ResponseWriter, r *http.Request) {
+		ok, err := s.StopEmergency("server")
+		if err != nil {
+			jsonErr(w, http.StatusInternalServerError, "save")
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "wasActive": ok})
+	})
 	return m
 }

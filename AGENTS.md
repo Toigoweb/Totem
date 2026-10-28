@@ -32,7 +32,7 @@ verifica e li pubblica, il totem li conserva **offline** e li mostra anche senza
 | Checklist di messa in servizio (Windows, Android) | [docs/04-messa-in-servizio.md](docs/04-messa-in-servizio.md) |
 | Wireframe approvati | [wireframes/index.html](wireframes/index.html) |
 
-## 3. Funzioni presenti (versione 1.1.x)
+## 3. Funzioni presenti (versione 1.2.x)
 
 - **Sezioni** (massimo 8) con icona, ordine, flag emergenza; origine dei PDF per sezione:
   cartella **SMB**, **OneDrive/SharePoint** (Microsoft Graph, app Entra ID), **WebDAV**,
@@ -54,6 +54,11 @@ verifica e li pubblica, il totem li conserva **offline** e li mostra anche senza
 - **Mappa incidenti**: planimetrie, eventi (infortunio, medicazione, quasi incidente,
   danno), mappa di calore sul totem, giorni senza infortuni, export CSV.
 - **Pagina in HTTP**: aperta senza HTTPS spiega che serve l'indirizzo di NPM.
+- **Emergenza**: evacuazione o avviso urgente a tutto schermo su tutti i dispositivi, da
+  manutenzione, API con token o `totem emergenza avvia`; resta anche offline.
+- **Tablet con FreeKiosk**: il server legge stato e posizione, segnala corrente,
+  batteria, temperatura e spostamenti, invia comandi, spegne lo schermo di notte e fa
+  leggere ad alta voce l'emergenza (README, "Tablet Android con FreeKiosk").
 - **Fase 2 (telefoni)**: nel modello e nelle API, spenta (`globali.fase2=false`).
 
 ## 4. Regole da rispettare
@@ -65,7 +70,9 @@ verifica e li pubblica, il totem li conserva **offline** e li mostra anche senza
    pdf.js e icone sono nel pacchetto. CSP rigida in `internal/api/server.go`.
 3. **Segreti**: password e client secret mai nei log, mai nella PWA, mai in chiaro su
    disco. Le note della mappa incidenti non vanno mai nel manifest. Niente nomi di persone
-   nei dati del totem.
+   nei dati del totem. La chiave API dei tablet resta sul server.
+   **Mai fotocamera, microfono o posizione** dei tablet: sarebbero controllo a distanza dei
+   lavoratori (art. 4 L. 300/1970) e non servono a un totem documentale.
 4. **Sorgenti in sola lettura**: il server non scrive mai su SMB, OneDrive o WebDAV.
 5. **Interfaccia**: tutte le stringhe in `web/src/strings.js`, in italiano. Pulsanti
    grandi (uso con i guanti), contrasto alto, stato mai solo a colori (icona + testo).
@@ -147,8 +154,8 @@ Nelle sessioni cloud di Claude Code usate finora:
 
 1. Segnalazione di pericoli e quasi incidenti dal totem (anonima, da verificare in
    manutenzione prima di entrare nella mappa).
-2. Modalità emergenza su tutti i totem (evacuazione o messaggio urgente a tutto schermo,
-   da manutenzione, API o contatto della centrale antincendio).
+2. ~~Modalità emergenza~~ fatta (v1.2): resta da valutare un ingresso a contatto pulito
+   della centrale antincendio tramite un modulo di rete (relè/IO) che chiami l'API.
 3. Pittogrammi GHS (frasi H) e DPI estratti dalle SDS, ricerca per pericolo.
 4. Codici QR da stampare per armadi, macchine e reparti (apertura del documento da
    telefono abbinato, fase 2).

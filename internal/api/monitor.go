@@ -10,6 +10,7 @@ import (
 
 	"github.com/toigoweb/totem/internal/auth"
 	"github.com/toigoweb/totem/internal/config"
+	"github.com/toigoweb/totem/internal/kiosk"
 )
 
 // Pagina di stato per gli strumenti di monitoraggio (Uptime Kuma, Zabbix, Nagios…).
@@ -49,6 +50,8 @@ type monitorReport struct {
 	Sections        []monitorSection `json:"sections"`
 	Totems          []monitorDevice  `json:"totems"`
 	Discarded       int              `json:"discardedDocuments"`
+	Tablets         []kiosk.Issue    `json:"tablets"`
+	Emergency       *emergencyOut    `json:"emergency,omitempty"`
 	Problems        []string         `json:"problems"`
 	Warnings        []string         `json:"warnings"`
 }
@@ -95,6 +98,27 @@ func (s *Server) monitorReport() monitorReport {
 	sort.Slice(rep.Totems, func(i, j int) bool { return rep.Totems[i].Name < rep.Totems[j].Name })
 	if len(cfg.Globali.Dispositivi) == 0 || len(rep.Totems) == 0 {
 		rep.Warnings = append(rep.Warnings, "nessun totem abbinato")
+	}
+	// tablet (FreeKiosk): corrente, batteria, temperatura, posizione, raggiungibilità
+	rep.Tablets = []kiosk.Issue{}
+	if s.o.Kiosk != nil {
+		for _, is := range s.o.Kiosk.Issues() {
+			rep.Tablets = append(rep.Tablets, is)
+			msg := fmt.Sprintf("tablet %q: %s", is.Device, is.Text)
+			if is.Error {
+				rep.OK = false
+				rep.Problems = append(rep.Problems, msg)
+			} else {
+				rep.Warnings = append(rep.Warnings, msg)
+			}
+		}
+	}
+	if s.o.Emergency != nil {
+		if em := s.o.Emergency.Get(); em.Attiva {
+			v := emergencyView(em)
+			rep.Emergency = &v
+			rep.Warnings = append(rep.Warnings, fmt.Sprintf("emergenza in corso dalle %s: %s", em.Avviata.Local().Format("15:04"), em.Title()))
+		}
 	}
 	rep.Discarded = len(s.o.Scanner.Problems())
 	if rep.Discarded > 0 {

@@ -4,7 +4,7 @@
 .
 ├── AGENTS.md, CLAUDE.md         guida per chi riprende il progetto (persone e assistenti AI)
 ├── cmd/totem/main.go            entrypoint: serve (default) | healthcheck | stato | scan | reset-pairing [--reset-pin]
-│                                | abbina-postazione --nome | abbina-totem --reparto | version
+│                                | abbina-postazione --nome | abbina-totem --reparto | emergenza avvia|termina | version
 ├── internal/
 │   ├── config/                  config.json: load, migrazioni con backup, salvataggio atomico, AES-GCM,
 │   │                            reparti, numeri utili, avvisi, salvaschermo, monitoraggio
@@ -12,6 +12,8 @@
 │   ├── davsrc/                  sorgente WebDAV (PROPFIND, Basic auth)
 │   ├── graphsrc/                sorgente OneDrive/SharePoint (Microsoft Graph, client credentials)
 │   ├── safety/                  mappa incidenti: planimetrie, eventi, safety.json
+│   ├── kiosk/                   client dell'API FreeKiosk, controlli periodici, avvisi, schermo di notte, annuncio
+│   ├── emergency/               stato della modalità emergenza (emergency.json)
 │   ├── sources/                 scelta della sorgente per tipo; cartella dei caricamenti diretti
 │   ├── scanner/                 scansione, stabilità, validazione PDF, blob store, manifest, GC
 │   ├── auth/                    PIN argon2id, blocco tentativi, codice di setup, token dispositivo e manutenzione
@@ -32,9 +34,11 @@
 │       ├── components/          barra superiore, logo con pressione lunga, tastierino PIN, icone
 │       ├── screens/             Home, Ricerca, Sezione, Lettura, Stato, PIN, Manutenzione, form della sezione,
 │       │                        Procedura guidata, Dispositivi, Extras (reparti, numeri, avvisi, salvaschermo,
-│       │                        monitoraggio), Uploads, SafetyMap/SafetyAdmin (mappa incidenti), Insecure (HTTP)
+│       │                        monitoraggio), Uploads, SafetyMap/SafetyAdmin (mappa incidenti), Insecure (HTTP),
+│       │                        EmergencyAdmin (emergenza), KioskDevice (tablet FreeKiosk)
 │       ├── heatmap.js           mappa di calore su canvas, filtri, giorni senza infortuni
-│       ├── kiosk/               inattività, errori globali, aggiornamenti notturni, salvaschermo
+│       ├── kiosk/               inattività, errori globali, aggiornamenti notturni, salvaschermo,
+│       │                        emergenza (lettura periodica e schermata a tutto schermo)
 │       └── sw.js                service worker (Workbox injectManifest, solo shell)
 ├── wireframes/index.html        wireframe statici navigabili (approvati)
 ├── deploy/windows/              watchdog del kiosk Chrome e script di installazione (fase A)
@@ -43,7 +47,7 @@
 │   ├── integration/             test Go con tag `integration` contro Samba
 │   ├── fixtures/genpdf.py       generatore di PDF di prova (SDS con 16 sezioni, generici, troncati)
 │   └── e2e/                     Playwright: Chromium desktop + tablet Android emulato, server Go e Samba
-│                                (resilienza, comportamenti, postazioni, reparti, origini, mappa, https)
+│                                (resilienza, comportamenti, postazioni, reparti, origini, mappa, https, emergenza)
 ├── docs/                        architettura, formati, messa in servizio
 ├── Dockerfile                   node → go → distroless/static:nonroot
 ├── docker-compose.yml           l'unico compose di produzione (docker compose e Portainer)

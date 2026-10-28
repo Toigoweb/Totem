@@ -196,7 +196,29 @@ L'app la chiede all'avvio e mostra l'esito nella schermata Stato.
 - ☐ Blocco schermo: nessuno (o scorrimento), così il riavvio non si ferma sul PIN di
   Android.
 
-### B2. Fully Kiosk Browser Plus
+### B2. App kiosk: FreeKiosk (consigliata) o Fully Kiosk Browser Plus
+
+**FreeKiosk** è gratuita e open source e ha l'API che il server usa per stato del tablet,
+comandi, schermo spento di notte e annuncio vocale di emergenza. Installazione e
+configurazione passo per passo: README, "Tablet Android con FreeKiosk". Checklist:
+
+- ☐ IP fisso del tablet (prenotazione DHCP) annotato nella scheda del totem.
+- ☐ Certificato della CA interna installato sul tablet.
+- ☐ Account rimossi, APK installato, **Device Owner** attivo
+  (`adb shell dpm list-owners` mostra `com.freekiosk`).
+- ☐ FreeKiosk: URL del totem, PIN di FreeKiosk (diverso da quello del totem), **REST API**
+  attiva con chiave lunga e diversa per ogni tablet, salvaschermo e pulizia di
+  cache/cookie disattivati.
+- ☐ Firewall: la porta dell'API del tablet raggiungibile **solo dal server Docker**.
+- ☐ Dopo la procedura guidata: Manutenzione → Dispositivi → **Tablet** → indirizzo e
+  chiave → Prova connessione → Salva. Lo stato mostra batteria "in carica".
+- ☐ Prova: **Screenshot** dalla manutenzione di una postazione mostra la Home del totem.
+- ☐ Prova di emergenza in orario concordato: Manutenzione → Emergenza → Avvia; il tablet
+  accende lo schermo e legge il messaggio; poi Termina.
+
+Con FreeKiosk i punti B4 (impostazioni di Fully) non servono; B1, B3, B5 e B6 valgono
+uguali. **Con Fully Kiosk** (licenza PLUS, a pagamento) il totem funziona allo stesso modo
+ma il server non può controllare il tablet:
 
 - ☐ Installare Fully Kiosk Browser dal sito ufficiale o dal Play Store e attivare la
   licenza **PLUS** per il dispositivo.

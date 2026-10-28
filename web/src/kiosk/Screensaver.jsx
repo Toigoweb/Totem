@@ -15,7 +15,7 @@ const BLOCKED = new Set(['wizard', 'pin', 'changePin']);
 
 export function screensaverMode(s, now = new Date()) {
   const ss = s.extras && s.extras.screensaver;
-  if (!ss || s.role !== 'totem' || s.maint || BLOCKED.has(s.route.name)) return null;
+  if (!ss || s.role !== 'totem' || s.maint || s.emergency || BLOCKED.has(s.route.name)) return null;
   const night = ss.night && inWindow(ss.nightHours, now);
   if (!ss.enabled && !night) return null;
   if (now.getTime() - s.lastInteraction < (ss.afterMinutes || 5) * 60000) return null;
@@ -57,7 +57,7 @@ export function Screensaver() {
     app.set({ lastInteraction: Date.now() });
     setShown(null);
   };
-  if (!shown) return null;
+  if (!shown || s.emergency) return null; // l'emergenza ha la precedenza
   const contacts = s.extras.contacts || [];
   const notices = activeNotices(s.extras.notices, now);
   const dep = s.extras.department;

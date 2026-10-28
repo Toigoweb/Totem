@@ -16,6 +16,8 @@ import (
 
 	"github.com/toigoweb/totem/internal/auth"
 	"github.com/toigoweb/totem/internal/config"
+	"github.com/toigoweb/totem/internal/emergency"
+	"github.com/toigoweb/totem/internal/kiosk"
 	"github.com/toigoweb/totem/internal/safety"
 	"github.com/toigoweb/totem/internal/scanner"
 	"github.com/toigoweb/totem/internal/smbsrc"
@@ -49,10 +51,13 @@ type Options struct {
 	Settings config.Settings
 	DataDir  string
 	Safety   *safety.Store // planimetrie ed eventi (mappa incidenti)
-	Static   fs.FS         // contenuto di web/dist
-	Version  string
-	Logger   *slog.Logger
-	Now      func() time.Time
+	// Kiosk: tablet con app kiosk controllabile (facoltativo); Emergency: modalità emergenza
+	Kiosk     *kiosk.Manager
+	Emergency *emergency.Store
+	Static    fs.FS // contenuto di web/dist
+	Version   string
+	Logger    *slog.Logger
+	Now       func() time.Time
 }
 
 type Server struct {
@@ -61,8 +66,10 @@ type Server struct {
 	pinLimiter     *auth.Limiter
 	codeLimiter    *auth.Limiter
 	monitorLimiter *auth.Limiter
-	maint          *auth.Sessions // valore: id del dispositivo
-	setup          *auth.Sessions // valore: "setup"
+	// token di emergenza sbagliati: blocco come il PIN
+	emergencyLimiter *auth.Limiter
+	maint            *auth.Sessions // valore: id del dispositivo
+	setup            *auth.Sessions // valore: "setup"
 
 	mu        sync.Mutex
 	setupCode string               // vuoto se il totem è già abbinato
@@ -84,14 +91,15 @@ func New(o Options) *Server {
 		pinLimiter:  auth.NewLimiter(o.Settings.PinAttempts, o.Settings.PinLockout),
 		codeLimiter: auth.NewLimiter(o.Settings.PinAttempts, o.Settings.PinLockout),
 		// il monitoraggio interroga spesso: blocco solo dopo molti token sbagliati
-		monitorLimiter: auth.NewLimiter(20, o.Settings.PinLockout),
-		maint:          auth.NewSessions(o.Settings.MaintenanceIdle, 0),
-		setup:          auth.NewSessions(15*time.Minute, 30*time.Minute),
-		tests:          map[string]testGrant{},
-		pairCodes:      map[string]pairGrant{},
-		lastSeen:       map[string]time.Time{},
+		monitorLimiter:   auth.NewLimiter(20, o.Settings.PinLockout),
+		emergencyLimiter: auth.NewLimiter(o.Settings.PinAttempts, o.Settings.PinLockout),
+		maint:            auth.NewSessions(o.Settings.MaintenanceIdle, 0),
+		setup:            auth.NewSessions(15*time.Minute, 30*time.Minute),
+		tests:            map[string]testGrant{},
+		pairCodes:        map[string]pairGrant{},
+		lastSeen:         map[string]time.Time{},
 	}
-	s.pinLimiter.Now, s.codeLimiter.Now, s.monitorLimiter.Now = o.Now, o.Now, o.Now
+	s.pinLimiter.Now, s.codeLimiter.Now, s.monitorLimiter.Now, s.emergencyLimiter.Now = o.Now, o.Now, o.Now, o.Now
 	s.maint.Now, s.setup.Now = o.Now, o.Now
 	return s
 }
@@ -114,6 +122,9 @@ func (s *Server) Handler() http.Handler {
 	m.Handle("POST /api/heartbeat", s.device(http.HandlerFunc(s.heartbeat)))
 	m.Handle("GET /api/status", s.device(http.HandlerFunc(s.status)))
 	m.Handle("POST /api/scan", s.device(http.HandlerFunc(s.scanNow)))
+	m.Handle("GET /api/emergency", s.device(http.HandlerFunc(s.getEmergency)))
+	m.HandleFunc("POST /api/emergency/start", s.apiEmergency(true))
+	m.HandleFunc("POST /api/emergency/stop", s.apiEmergency(false))
 	m.Handle("POST /api/maint/login", s.staffOnly(http.HandlerFunc(s.maintLogin)))
 
 	// manutenzione (PIN)
@@ -136,6 +147,18 @@ func (s *Server) Handler() http.Handler {
 	m.Handle("GET /api/maint/problems", s.maintOnly(http.HandlerFunc(s.problems)))
 	m.Handle("POST /api/maint/totems/pair-code", s.maintOnly(http.HandlerFunc(s.totemCode)))
 	m.Handle("PUT /api/maint/devices/{id}", s.maintOnly(http.HandlerFunc(s.updateDevice)))
+
+	// tablet con app kiosk (FreeKiosk) ed emergenza
+	m.Handle("PUT /api/maint/devices/{id}/kiosk", s.maintOnly(http.HandlerFunc(s.putKiosk)))
+	m.Handle("POST /api/maint/devices/{id}/kiosk/{azione}", s.maintOnly(http.HandlerFunc(s.kioskAction)))
+	m.Handle("GET /api/maint/devices/{id}/kiosk/screenshot", s.maintOnly(http.HandlerFunc(s.kioskScreenshot)))
+	m.Handle("POST /api/maint/kiosk/test", s.maintOnly(http.HandlerFunc(s.testKiosk)))
+	m.Handle("GET /api/maint/emergency", s.maintOnly(http.HandlerFunc(s.maintEmergency)))
+	m.Handle("POST /api/maint/emergency/start", s.maintOnly(http.HandlerFunc(s.maintEmergencyStart)))
+	m.Handle("POST /api/maint/emergency/stop", s.maintOnly(http.HandlerFunc(s.maintEmergencyStop)))
+	m.Handle("POST /api/maint/emergency/announce", s.maintOnly(http.HandlerFunc(s.maintEmergencyAnnounce)))
+	m.Handle("POST /api/maint/emergency/token", s.maintOnly(http.HandlerFunc(s.newEmergencyToken)))
+	m.Handle("DELETE /api/maint/emergency/token", s.maintOnly(http.HandlerFunc(s.deleteEmergencyToken)))
 
 	// reparti, numeri utili, avvisi, salvaschermo, monitoraggio
 	m.Handle("GET /api/maint/extras", s.maintOnly(http.HandlerFunc(s.getExtras)))

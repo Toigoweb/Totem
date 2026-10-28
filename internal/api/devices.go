@@ -305,6 +305,8 @@ type deviceOut struct {
 	LastSync   *time.Time `json:"lastSync,omitempty"`
 	Documents  *int       `json:"documents,omitempty"`
 	FreeBytes  *int64     `json:"freeBytes,omitempty"`
+	// tablet con app kiosk controllabile (FreeKiosk), se collegato
+	Kiosk *kioskOut `json:"kiosk,omitempty"`
 }
 
 func (s *Server) readHeartbeats() map[string]heartbeatReq {
@@ -338,6 +340,7 @@ func (s *Server) listDevices(w http.ResponseWriter, r *http.Request) {
 				n, f := hb.Documents, hb.FreeBytes
 				o.Documents, o.FreeBytes = &n, &f
 			}
+			o.Kiosk = s.kioskOf(d)
 			out = append(out, o)
 		}
 	})

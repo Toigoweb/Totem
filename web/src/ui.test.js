@@ -6,6 +6,8 @@ import { validPath, validUser, checkSource } from './screens/SectionForm.jsx';
 import { validFolder } from './screens/Uploads.jsx';
 import { filterEvents, countByType, daysWithoutInjury } from './heatmap.js';
 import { buildIndex } from './screens/Search.jsx';
+import { normalize } from './kiosk/emergency.js';
+import { validTabletAddress } from './screens/KioskDevice.jsx';
 
 const base = { sync: { running: false, progress: null, lastError: null }, deviceError: false, settings: { staleDays: 3 }, meta: { lastSuccess: null, lastError: null } };
 const now = new Date('2026-10-24T08:20:00');
@@ -52,6 +54,7 @@ describe('aggiornamenti notturni', () => {
     expect(shouldApply(s, t)).toBe(true);
     expect(shouldApply({ ...s, route: { name: 'reader' } }, t)).toBe(false);
     expect(shouldApply({ ...s, lastInteraction: t.getTime() - 60000 }, t)).toBe(false);
+    expect(shouldApply({ ...s, emergency: { id: 'em_1' } }, t)).toBe(false); // mai durante un'emergenza
     expect(shouldApply(s, new Date('2026-10-24T12:00:00'))).toBe(false);
   });
 });
@@ -97,6 +100,7 @@ describe('avvisi e salvaschermo', () => {
     expect(screensaverMode({ ...base, lastInteraction: t.getTime() - 60000 }, t)).toBe(null);
     expect(screensaverMode({ ...base, role: 'postazione' }, t)).toBe(null);
     expect(screensaverMode({ ...base, maint: { token: 'x' } }, t)).toBe(null);
+    expect(screensaverMode({ ...base, emergency: { id: 'em_1' } }, t)).toBe(null); // l'emergenza ha la precedenza
     expect(screensaverMode({ ...base, route: { name: 'wizard' } }, t)).toBe(null);
     expect(screensaverMode(base, new Date('2026-10-24T22:00:00'))).toBe('nero');
     const off = { ...base, extras: { screensaver: { ...base.extras.screensaver, enabled: false } } };
@@ -153,5 +157,18 @@ describe('mappa incidenti', () => {
     expect(daysWithoutInjury('', '2026-10-01', today)).toBe(24);
     expect(daysWithoutInjury('2025-05-01', '2026-10-01', today)).toBe(24); // infortunio prima dell'inizio
     expect(daysWithoutInjury('2026-10-20', '', today)).toBe(null);
+  });
+});
+
+describe('emergenza e tablet', () => {
+  it('normalizza lo stato dell\'emergenza', () => {
+    expect(normalize({ active: false })).toBe(null);
+    expect(normalize(null)).toBe(null);
+    expect(normalize({ active: true, id: 'em_1', type: 'evacuazione', title: 'Evacuazione', text: 'Uscire', since: '2026-10-28T10:00:00Z', extra: 1 }))
+      .toEqual({ id: 'em_1', type: 'evacuazione', title: 'Evacuazione', text: 'Uscire', since: '2026-10-28T10:00:00Z' });
+  });
+  it('indirizzo del tablet', () => {
+    for (const ok of ['192.168.2.60', '192.168.2.60:8080', 'tablet-1.local:9000']) expect(validTabletAddress(ok)).toBe(true);
+    for (const ko of ['http://192.168.2.60', '192.168.2.60:0', '192.168.2.60:70000', 'a b', '']) expect(validTabletAddress(ko)).toBe(false);
   });
 });

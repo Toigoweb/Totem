@@ -452,6 +452,155 @@ curl -H "Authorization: Bearer <token>" "https://totem.azienda.it/api/monitor?fo
   di spegnimento.
 - Sul server, senza token: `docker compose exec totem /totem stato` (uscita 1 se c'è un
   errore, utile in uno script).
+- Con i tablet FreeKiosk collegati (vedi sotto) la pagina segnala anche: tablet
+  **scollegato dalla corrente** da più di 10 minuti, batteria sotto il 20%, batteria oltre
+  45 °C, tablet non raggiungibile (errori); tablet **spostato o inclinato** di oltre 25°
+  (avviso). Un'emergenza in corso compare come avviso.
+
+### Emergenza
+
+Manutenzione → **Emergenza** mostra a tutto schermo, su tutti i totem e le postazioni, un
+messaggio di **evacuazione** (testo predefinito modificabile) o un **avviso urgente** (es.
+"Fuga di gas in magazzino: non entrare"), finché qualcuno non lo termina.
+
+- I totem controllano ogni 10 secondi: l'emergenza compare entro pochi secondi e resta a
+  schermo anche se poi la rete cade o il totem si riavvia.
+- Sulla schermata ci sono i numeri utili e i pulsanti delle sezioni di emergenza: aprendo
+  un piano la schermata si riduce a una fascia rossa in basso e torna a tutto schermo dopo
+  un minuto senza tocchi. Salvaschermo e aggiornamenti dell'app restano sospesi.
+- Si termina da Manutenzione → Emergenza su qualsiasi totem o postazione, oppure dalla
+  schermata stessa con **Termina emergenza (PIN)**.
+- I **tablet con FreeKiosk** accendono lo schermo (anche se spento per la notte), mettono
+  il volume al massimo, suonano un segnale e **leggono il messaggio ad alta voce**
+  (sintesi vocale italiana del tablet). "Ripeti l'annuncio vocale" lo ripete.
+- **Avvio da sistemi esterni** (centrale antincendio con un contatto, pulsante, Home
+  Assistant, Node-RED…): Emergenza → **Genera token** (mostrato una volta), poi
+
+  ```sh
+  curl -X POST -H "Authorization: Bearer <token>" https://totem.azienda.it/api/emergency/start
+  curl -X POST -H "Authorization: Bearer <token>" -H "Content-Type: application/json" \
+       -d '{"tipo":"avviso","testo":"Fuga di gas in magazzino: non entrare"}' https://totem.azienda.it/api/emergency/start
+  curl -X POST -H "Authorization: Bearer <token>" https://totem.azienda.it/api/emergency/stop
+  ```
+
+  Senza corpo parte un'evacuazione con il testo predefinito. Dal server, senza token:
+  `docker compose exec totem /totem emergenza avvia [--tipo avviso --testo "…"]` e
+  `… /totem emergenza termina`.
+- Il totem **affianca** l'impianto di allarme e le procedure di emergenza: non è un
+  sistema di allarme certificato e non va usato al posto delle sirene.
+
+### Tablet Android con FreeKiosk
+
+[FreeKiosk](https://github.com/rushb-fr/freekiosk) è un'app kiosk open source e gratuita
+per Android. Rispetto a un browser bloccato ha un'API REST in LAN che il server del totem
+usa per: stato del tablet (batteria, corrente, temperatura, Wi-Fi, spazio), avvisi nel
+monitoraggio, comandi (ricarica, riavvio app o tablet, schermo), screenshot dello
+schermo, luminosità automatica, **schermo spento di notte** e **annuncio vocale di
+emergenza**. Fotocamera, posizione ed esecuzione di JavaScript non vengono mai usati.
+
+**1. Preparare il tablet**
+- Android 8 o successivo (meglio 10+), sempre in carica; se il modello lo prevede, limite
+  di carica all'85%.
+- **IP fisso** (prenotazione DHCP sul router o sul firewall): il server lo chiama per
+  indirizzo.
+- **Certificato della CA interna**: *Impostazioni → Sicurezza → Crittografia e credenziali
+  → Installa un certificato → Certificato CA* (il percorso varia per marca). Va fatto prima
+  di aprire il totem. Alcune app non si fidano dei certificati installati dall'utente: la
+  prova offline del punto 5 dice se funziona. Se il totem non si apre o non resta
+  disponibile offline, il certificato va distribuito come CA di sistema con l'MDM aziendale.
+- Rimuovere **tutti gli account** (Google, Samsung, Microsoft) e la SIM: servono per la
+  modalità Device Owner del punto 3. Dopo si possono riaggiungere.
+
+**2. Installare l'APK**
+- Scaricare l'ultima `FreeKiosk-vX.Y.Z.apk` da
+  [GitHub Releases](https://github.com/rushb-fr/freekiosk/releases) e copiarla sul tablet.
+- Aprirla e consentire "Installa app sconosciute" per l'app usata (File, Chrome).
+- **Non aprire ancora FreeKiosk.**
+
+**3. Device Owner (consigliato)**
+Serve per il blocco completo (niente barra di stato, tasti, notifiche, popup del
+produttore) e perché spegnimento dello schermo e riavvio funzionino davvero.
+- Sul tablet: *Impostazioni → Info sul tablet →* toccare 7 volte **Numero build**, poi
+  *Opzioni sviluppatore → Debug USB* attivo.
+- Collegare il tablet a un PC con [ADB](https://developer.android.com/tools/releases/platform-tools)
+  e accettare la richiesta sul tablet, poi:
+
+  ```sh
+  adb devices
+  adb shell dpm set-device-owner com.freekiosk/.DeviceAdminReceiver
+  ```
+
+  Deve rispondere `Success: Device owner set to package com.freekiosk`. Se dice "Not
+  allowed", c'è ancora un account sul tablet: rimuoverlo (o ripristinare il tablet senza
+  aggiungerne).
+
+**4. Configurare FreeKiosk** (con ADB in un colpo solo, oppure a mano: 5 tocchi
+nell'angolo in basso a destra → PIN)
+
+```sh
+adb shell am start -n com.freekiosk/.MainActivity \
+    --es pin "PIN-DI-FREEKIOSK" \
+    --es url "https://totem.azienda.it" \
+    --es rest_api_enabled "true" --es rest_api_port "8080" \
+    --es rest_api_key "CHIAVE-LUNGA-DIVERSA-PER-OGNI-TABLET" \
+    --es screensaver_enabled "false"
+```
+
+| Impostazione di FreeKiosk | Valore |
+|---|---|
+| URL (modalità WebView) | `https://totem.azienda.it` (l'indirizzo HTTPS di NPM) |
+| PIN di FreeKiosk | diverso dal PIN del totem, conservato dall'IT |
+| Advanced → **Enable REST API** | attivo, porta `8080`, **chiave API** lunga (almeno 16 caratteri), diversa per ogni tablet |
+| Salvaschermo di FreeKiosk | disattivato: c'è già quello del totem |
+| Pianificazione dello schermo di FreeKiosk | disattivata, se si usa "Spegni lo schermo di notte" del totem |
+| Pulsante di reset della sessione, pulizia di cache e cookie | **disattivati**: cancellerebbero i documenti offline e l'abbinamento |
+| Visualizzatore PDF integrato | disattivato: i PDF li apre il totem |
+| Fotocamera, rilevamento movimento, MQTT, cloud | non servono: lasciarli spenti |
+
+Poi in FreeKiosk **Start Kiosk Mode**.
+
+**5. Primo avvio e prove**
+- Sul tablet compare la procedura guidata del totem: codice (di setup, di nuovo totem o di
+  postazione) e PIN, come per il PC.
+- Prova offline: dopo la prima sincronizzazione disattivare il Wi-Fi, riavviare il tablet:
+  il totem si apre e i PDF si leggono. Se non funziona, rivedere il certificato della CA
+  (punto 1).
+
+**6. Collegare il tablet al server**
+- Manutenzione → Dispositivi → riga del totem → **Tablet**: indirizzo (es.
+  `192.168.2.60:8080`) e chiave API → **Prova connessione** → **Salva**. La chiave è
+  cifrata sul server e non torna più al browser.
+- Facoltativi: **Spegni lo schermo di notte** (orario notturno del salvaschermo; durante
+  un'emergenza lo schermo si riaccende) e **Luminosità automatica**.
+- Nella stessa schermata: stato, comandi (ricarica, riavvia app, riavvia tablet,
+  accendi/spegni schermo, posizione attuale come riferimento) e **Screenshot** per vedere
+  da ufficio cosa mostra il totem.
+- La posizione di riferimento per l'avviso "tablet spostato" è quella del primo controllo:
+  se il tablet viene montato altrove, premere "Posizione attuale come riferimento".
+
+**7. Aggiornamenti sul tablet**
+
+| Cosa | Come si aggiorna | Consiglio |
+|---|---|---|
+| App del totem | Da sola, dal server (Portainer), di notte e in inattività | Niente da fare sul tablet |
+| **Android System WebView** e Chrome (il motore che mostra il totem) | Play Store | **Automatici**, solo su Wi-Fi: correggono falle di sicurezza del browser. Il Play Store aggiorna solo se sul tablet c'è un account Google: si può aggiungere **dopo** aver attivato il Device Owner |
+| **Android** (sistema e patch di sicurezza) | Impostazioni → Aggiornamento software | Download automatico **disattivato**; aggiornamento a mano ogni 2-3 mesi in una finestra di manutenzione, poi le prove del punto 5. Un aggiornamento di sistema può cambiare la WebView o i permessi e il tablet si riavvia |
+| **FreeKiosk** | APK nuovo da GitHub Releases (o Play Store, se installato da lì) | A mano, dopo aver letto le note di rilascio: `adb install -r FreeKiosk-vX.Y.Z.apk` oppure aprendo l'APK. Impostazioni e Device Owner restano |
+
+Procedura per gli aggiornamenti a mano: 5 tocchi in basso a destra → PIN di FreeKiosk →
+uscire dal kiosk → aggiornare → riavviare → **Start Kiosk Mode** → prova offline del
+punto 5. In Manutenzione → Dispositivi → Tablet il modello mostra la versione di Android
+attuale.
+
+Con più tablet conviene un MDM (Samsung Knox Manage, Intune, Google Android Enterprise),
+che rimanda gli aggiornamenti di sistema a una fascia oraria notturna. Il Device Owner
+però può essere uno solo: con un MDM che è già Device Owner, FreeKiosk si attiva come
+Device Admin o servizio di accessibilità. Spegnimento dello schermo e blocco funzionano,
+il riavvio da remoto no.
+
+**Sicurezza dell'API di FreeKiosk**: è HTTP in chiaro con una chiave. Tenerla solo sulla
+rete dei totem e, con il firewall, permettere la porta 8080 del tablet **solo
+dall'IP del server Docker**. Non esporla mai su Internet.
 
 ---
 
@@ -493,6 +642,7 @@ vecchio e avviare.
 | Configurazione | `/opt/totem/data/config.json` (e `data/backup/`) | Sezioni, PIN (hash), dispositivi, impostazioni |
 | Chiave di cifratura | `/opt/totem/secrets/key` | Senza la chiave le password (SMB, WebDAV) e i segreti OneDrive vanno reinseriti dal totem. Conservarla separata dal backup di `data`. |
 | Logo | `/opt/totem/data/logo.*` | Se presente |
+| Emergenza in corso | `/opt/totem/data/emergency.json` | Si ricrea da sé; serve solo a non perdere un'emergenza attiva al riavvio |
 | Mappa incidenti | `/opt/totem/data/safety.json` e `data/maps/` | **Da salvare**: planimetrie ed eventi esistono solo qui |
 | PDF caricati | `/opt/totem/data/uploads/` | **Da salvare**: per le sezioni a caricamento diretto è l'unica copia |
 | PDF delle altre origini | non serve | Si ricostruiscono da share, OneDrive o WebDAV alla prima scansione |

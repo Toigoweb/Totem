@@ -351,3 +351,33 @@ button.punto { cursor: pointer; width: 26px; height: 26px; margin: -13px 0 0 -13
 .salvaschermo .giorni strong { font-family: var(--f-titoli); font-size: 2.6rem; color: var(--giallo); }
 .dialogo.info { border-top-color: var(--navy); width: min(680px, 100%); }
 textarea.input { min-height: 80px; padding: 12px; resize: vertical; font: inherit; }
+
+/* emergenza */
+.emergenza-schermo { position: fixed; inset: 0; z-index: 60; background: var(--rosso); color: var(--bianco); display: grid; place-items: center; overflow: auto; padding: 24px; }
+.emergenza-schermo.t-evacuazione { animation: lampeggio 2s ease-in-out infinite; }
+@keyframes lampeggio { 50% { background: #8c1d17; } }
+@media (prefers-reduced-motion: reduce) { .emergenza-schermo.t-evacuazione { animation: none; } }
+.emergenza-schermo .c { display: grid; gap: 22px; justify-items: center; text-align: center; max-width: 1000px; }
+.emergenza-schermo svg.grande { width: 120px; height: 120px; }
+.emergenza-schermo h1 { margin: 0; font-family: var(--f-titoli); font-size: clamp(3rem, 8vw, 6rem); letter-spacing: .08em; line-height: 1; }
+.emergenza-schermo .testo { margin: 0; font-size: clamp(1.4rem, 3vw, 2.2rem); font-weight: 600; line-height: 1.35; }
+.emergenza-schermo .da { margin: 0; font-size: 1.1rem; opacity: .9; }
+.emergenza-schermo .numeri { display: flex; flex-wrap: wrap; gap: 12px 28px; justify-content: center; list-style: none; margin: 0; padding: 0; }
+.emergenza-schermo .numeri .num { font-family: var(--f-titoli); font-size: 2.4rem; font-weight: 700; margin-right: 10px; }
+.emergenza-schermo .btn { background: var(--bianco); color: var(--rosso); border-color: var(--bianco); min-height: 64px; font-size: 1.1rem; }
+.emergenza-schermo .btn.fine { background: transparent; color: var(--bianco); min-height: 52px; font-size: .95rem; margin-top: 12px; }
+.em-fascia { position: fixed; left: 0; right: 0; bottom: 0; z-index: 55; min-height: 64px; display: flex; align-items: center; gap: 14px; padding: 8px 20px; background: var(--rosso); color: var(--bianco); font-size: 1.1rem; }
+.em-fascia svg { width: 32px; height: 32px; flex: none; }
+.em-fascia strong { flex: 1; }
+.em-fascia .btn { background: var(--bianco); color: var(--rosso); border-color: var(--bianco); }
+body:has(.em-fascia) .screen { padding-bottom: 64px; }
+
+/* tablet FreeKiosk */
+.tab-stato { display: grid; gap: 4px; max-width: 760px; }
+.tab-riga { display: grid; grid-template-columns: 280px 1fr; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--grigio-chiaro); }
+.tab-riga .l { color: var(--grigio); }
+.tab-riga .v { font-weight: 600; }
+@media (max-width: 700px) { .tab-riga { grid-template-columns: 1fr; gap: 2px; } }
+.tab-shot { max-width: min(100%, 900px); border: 2px solid var(--grigio-chiaro); border-radius: 8px; margin-top: 12px; }
+.em-attiva p { margin: 6px 0 0; }
+body:has(.em-fascia) .toast { bottom: 88px; z-index: 56; }

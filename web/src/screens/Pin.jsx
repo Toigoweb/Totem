@@ -3,7 +3,7 @@ import { S } from '../strings.js';
 import { back, enterMaintenance, replace } from '../app.js';
 import { api } from '../api.js';
 
-export function Pin() {
+export function Pin({ next }) {
   return (
     <PinPad
       title={S.pinTitle}
@@ -13,7 +13,7 @@ export function Pin() {
         const res = pinResult(r);
         if (res.ok) {
           enterMaintenance(r.data.token);
-          replace('maint');
+          replace(next || 'maint');
         }
         return res;
       }}

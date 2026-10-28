@@ -16,7 +16,7 @@ export function shouldApply(s, now = new Date()) {
   const idleMin = s.settings.updateIdleMinutes || 15;
   return inWindow(s.settings.nightWindow || '02:00-05:00', now)
     && now.getTime() - s.lastInteraction >= idleMin * 60000
-    && s.route.name === 'home' && !s.maint && !s.sync.running;
+    && s.route.name === 'home' && !s.maint && !s.sync.running && !s.emergency;
 }
 
 export async function installUpdates() {

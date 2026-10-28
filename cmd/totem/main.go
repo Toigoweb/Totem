@@ -35,7 +35,9 @@ import (
 
 	"github.com/toigoweb/totem/internal/api"
 	"github.com/toigoweb/totem/internal/config"
+	"github.com/toigoweb/totem/internal/emergency"
 	"github.com/toigoweb/totem/internal/graphsrc"
+	"github.com/toigoweb/totem/internal/kiosk"
 	"github.com/toigoweb/totem/internal/safety"
 	"github.com/toigoweb/totem/internal/scanner"
 	"github.com/toigoweb/totem/internal/synclog"
@@ -78,10 +80,12 @@ func main() {
 		os.Exit(pairTotem(args))
 	case "stato":
 		os.Exit(statusText())
+	case "emergenza":
+		os.Exit(emergencyCmd(args))
 	case "version", "--version", "-v":
 		fmt.Println(version.Version)
 	default:
-		fmt.Fprintf(os.Stderr, "comando sconosciuto %q (serve | healthcheck | stato | scan | abbina-postazione [--nome N] | abbina-totem [--reparto R] | reset-pairing [--reset-pin] | version)\n", cmd)
+		fmt.Fprintf(os.Stderr, "comando sconosciuto %q (serve | healthcheck | stato | scan | abbina-postazione [--nome N] | abbina-totem [--reparto R] | emergenza avvia|termina | reset-pairing [--reset-pin] | version)\n", cmd)
 		os.Exit(2)
 	}
 }
@@ -157,13 +161,23 @@ func serve() int {
 		logger.Error("mappa incidenti", "err", err)
 		return 1
 	}
+	em, err := emergency.Open(dataDir)
+	if err != nil {
+		logger.Error("emergenza", "err", err)
+		return 1
+	}
+	if em.Active() {
+		logger.Warn("EMERGENZA IN CORSO (avviata prima del riavvio)", "testo", em.Get().Testo)
+	}
+	km := kiosk.New(kiosk.Options{Config: store, Cipher: ci, Logger: logger, EmergencyActive: em.Active})
 	srv := api.New(api.Options{Config: store, Cipher: ci, Scanner: sc, Log: syncLog, Settings: settings, DataDir: dataDir,
-		Safety: saf, Static: web.Dist(), Version: version.Version, Logger: logger})
+		Safety: saf, Kiosk: km, Emergency: em, Static: web.Dist(), Version: version.Version, Logger: logger})
 	srv.EnsureSetupCode()
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	go sc.Run(ctx)
+	go km.Run(ctx, kiosk.DefaultPollPeriod)
 
 	pub := &http.Server{Addr: listenAddr, Handler: srv.Handler(), ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 120 * time.Second}
 	in := &http.Server{Addr: internalAddr, Handler: srv.InternalHandler(), ReadHeaderTimeout: 5 * time.Second}
@@ -359,4 +373,42 @@ func pinNote(reset bool) string {
 		return " e PIN azzerato"
 	}
 	return " (PIN e sezioni invariati)"
+}
+
+// emergencyCmd avvia o termina l'emergenza dal server:
+//
+//	totem emergenza avvia [--tipo evacuazione|avviso] [--testo "…"]
+//	totem emergenza termina
+func emergencyCmd(args []string) int {
+	if len(args) == 0 || (args[0] != "avvia" && args[0] != "termina") {
+		fmt.Fprintln(os.Stderr, "uso: totem emergenza avvia [--tipo evacuazione|avviso] [--testo \"…\"] | totem emergenza termina")
+		return 2
+	}
+	path := "/internal/emergency/stop"
+	if args[0] == "avvia" {
+		fs := flag.NewFlagSet("emergenza avvia", flag.ContinueOnError)
+		tipo := fs.String("tipo", "evacuazione", "evacuazione oppure avviso")
+		testo := fs.String("testo", "", "messaggio (obbligatorio per avviso)")
+		if err := fs.Parse(args[1:]); err != nil {
+			return 2
+		}
+		path = "/internal/emergency/start?tipo=" + url.QueryEscape(*tipo) + "&testo=" + url.QueryEscape(*testo)
+	}
+	c := &http.Client{Timeout: 5 * time.Second}
+	resp, err := c.Post(internalURL(path), "application/json", bytes.NewReader(nil))
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "emergenza: server non raggiungibile:", err)
+		return 1
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		fmt.Fprintln(os.Stderr, "emergenza: richiesta rifiutata, HTTP", resp.StatusCode, "(per un avviso serve --testo)")
+		return 1
+	}
+	if args[0] == "avvia" {
+		fmt.Println("Emergenza avviata: i totem la mostrano entro pochi secondi. Per terminarla: totem emergenza termina")
+	} else {
+		fmt.Println("Emergenza terminata.")
+	}
+	return 0
 }

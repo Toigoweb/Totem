@@ -81,6 +81,14 @@ export function Devices() {
                 {S.docsOnDevice}: {d.documents} · {S.lastSyncOf}: {fmtWhen(d.lastSync) || S.never2} · {S.freeOnDevice}: {d.freeBytes ? fmtBytes(d.freeBytes) : '–'}
               </div>
             )}
+            {d.kiosk && (
+              <div class="piccolo" data-testid="device-tablet">
+                <Icon name={d.kiosk.stato.issues.some((i) => i.error) ? 'errore' : d.kiosk.stato.ok ? 'spunta' : 'avviso'} />{' '}
+                FreeKiosk {d.kiosk.indirizzo}
+                {d.kiosk.stato.battery != null && ` · ${S.tabBattery} ${Math.round(d.kiosk.stato.battery)}%${d.kiosk.stato.charging ? '' : ` (${S.tabNotCharging})`}`}
+                {d.kiosk.stato.issues.length > 0 && ` · ${d.kiosk.stato.issues.map((i) => i.text).join(' · ')}`}
+              </div>
+            )}
             {d.ruolo === 'totem' && reparti.length > 0 && (
               <label class="piccolo" style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '6px' }}>
                 {S.department}
@@ -93,6 +101,9 @@ export function Devices() {
             )}
           </div>
           <div class="b">
+            {d.ruolo !== 'telefono' && (
+              <button class="btn" data-testid="open-tablet" onClick={() => go('kioskDevice', { id: d.id })}><Icon name="ingranaggio" />{S.tabButton}</button>
+            )}
             {d.ruolo === 'totem' && (
               <button class="btn" onClick={() => go('pairStation', { kind: 'replace', target: d.id, targetName: d.nome })}><Icon name="sync" />{S.replaceTotem}</button>
             )}

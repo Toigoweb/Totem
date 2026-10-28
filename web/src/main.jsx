@@ -6,6 +6,7 @@ import { init } from './app.js';
 import { installErrorHandlers } from './kiosk/errors.js';
 import { installIdle } from './kiosk/idle.js';
 import { installUpdates } from './kiosk/updates.js';
+import { installEmergency } from './kiosk/emergency.js';
 import { Insecure, missingSecureFeatures } from './screens/Insecure.jsx';
 
 if (missingSecureFeatures()) {
@@ -15,6 +16,7 @@ if (missingSecureFeatures()) {
   installErrorHandlers();
   render(<App />, document.getElementById('app'));
   init().then(() => {
+    installEmergency();
     installIdle();
     installUpdates();
   });
