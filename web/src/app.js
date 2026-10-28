@@ -108,6 +108,47 @@ export function cycleScale() {
 }
 
 // ---------------------------------------------------------------------------
+// Dati del dispositivo per il segnale periodico al server
+
+/** "Chrome 131" o "WebView 131" dallo user agent. */
+export function browserName(ua = globalThis.navigator ? navigator.userAgent : '') {
+  const m = /Chrome\/(\d+)/.exec(ua);
+  if (!m) return '';
+  return `${/; wv\)/.test(ua) ? 'WebView' : 'Chrome'} ${m[1]}`;
+}
+
+/** Cosa mostra ora il dispositivo, in poche parole (niente dati personali). */
+export function describeView(s) {
+  if (s.emergency) return `Emergenza: ${s.emergency.title || ''}`.trim();
+  if (s.maint) return 'Manutenzione';
+  const r = s.route;
+  if (r.name === 'reader') {
+    const d = s.docs.find((x) => x.id === r.id);
+    return d ? `Documento: ${d.title}` : 'Documento';
+  }
+  if (r.name === 'section') {
+    const sec = s.sections.find((x) => x.id === r.id);
+    return sec ? `Sezione: ${sec.name}` : 'Sezione';
+  }
+  return { home: 'Home', search: 'Ricerca', status: 'Stato', safety: 'Situazione sicurezza', wizard: 'Procedura guidata', pin: 'PIN' }[r.name] || r.name;
+}
+
+let battery = null;
+async function heartbeatExtra() {
+  const out = { browser: browserName(), view: describeView(app.get()) };
+  try {
+    if (!battery && navigator.getBattery) battery = await navigator.getBattery();
+    // un PC fisso senza batteria risulta "in carica al 100%" sempre: non lo si manda
+    if (battery && !(battery.charging && battery.level === 1 && battery.chargingTime === 0)) {
+      out.battery = { level: Math.round(battery.level * 100), charging: battery.charging };
+    }
+  } catch {
+    // API non disponibile
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
 // Manutenzione
 
 export function enterMaintenance(token) {
@@ -137,7 +178,7 @@ export async function maintApi(path, opts = {}) {
 
 export async function startSync() {
   if (manager) return;
-  manager = createSyncManager({ db, appVersion: APP_VERSION });
+  manager = createSyncManager({ db, appVersion: APP_VERSION, heartbeatExtra });
   let wasRunning = false;
   manager.subscribe((st) => {
     app.set({ sync: st });

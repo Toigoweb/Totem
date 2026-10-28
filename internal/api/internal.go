@@ -51,6 +51,14 @@ func (s *Server) InternalHandler() http.Handler {
 		}
 		writeJSON(w, http.StatusOK, emergencyView(st))
 	})
+	m.HandleFunc("POST /internal/agent-token", func(w http.ResponseWriter, r *http.Request) {
+		tok, d, err := s.NewAgentToken(r.URL.Query().Get("dispositivo"))
+		if err != nil {
+			jsonErr(w, http.StatusNotFound, "dispositivo")
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"token": tok, "dispositivo": d.Nome})
+	})
 	m.HandleFunc("POST /internal/emergency/stop", func(w http.ResponseWriter, r *http.Request) {
 		ok, err := s.StopEmergency("server")
 		if err != nil {

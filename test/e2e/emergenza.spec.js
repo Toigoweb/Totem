@@ -35,7 +35,7 @@ test('emergenza: avvio dalla manutenzione, su tutti i dispositivi, anche offline
 
   await openMaint(page);
   await page.getByTestId('open-emergency').click();
-  await expect(page.getByTestId('emergency-admin')).toContainText('Nessun tablet con FreeKiosk');
+  await expect(page.getByTestId('emergency-admin')).toContainText('Nessun tablet FreeKiosk né PC con agente');
   await page.getByTestId('emergency-admin').locator('[data-tipo="avviso"]').click();
   await expect(page.getByTestId('emergency-start')).toBeDisabled(); // un avviso senza testo non parte
   await page.fill('#em-testo', 'Fuga di gas in magazzino: non entrare e allontanarsi dalla zona.');
@@ -120,6 +120,9 @@ test('tablet FreeKiosk: collegamento, stato, comandi, screenshot e annuncio di e
     await openMaint(page);
     await page.getByTestId('open-devices').click();
     await page.getByTestId('device-row').first().getByTestId('open-tablet').click();
+    await expect(page.getByTestId('device-control')).toBeVisible();
+    // su un PC (profilo desktop) la sezione del tablet si apre a mano; su Android c'è già
+    if (await page.getByTestId('show-tablet').count()) await page.getByTestId('show-tablet').click();
     await expect(page.getByTestId('kiosk-device')).toBeVisible();
     await page.fill('#k-addr', 'http://x');
     await expect(page.getByTestId('kiosk-device')).toContainText('Formato: indirizzo');
@@ -146,7 +149,7 @@ test('tablet FreeKiosk: collegamento, stato, comandi, screenshot e annuncio di e
     // emergenza: il tablet si sveglia, alza il volume e legge il messaggio
     await page.getByTestId('back').click();
     await page.getByTestId('open-emergency').click();
-    await expect(page.getByTestId('emergency-admin')).toContainText('1 tablet con FreeKiosk riceverà');
+    await expect(page.getByTestId('emergency-admin')).toContainText('1 dispositivo (tablet FreeKiosk o PC con agente)');
     await page.getByTestId('emergency-start').click();
     await page.getByTestId('confirm-emergency').click();
     await expect(page.getByTestId('emergency-active')).toBeVisible();

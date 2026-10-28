@@ -2,7 +2,7 @@
 // controlla ogni 10 secondi (5 durante l'emergenza) e la conserva in IndexedDB, così
 // resta a schermo anche se poi la rete cade. La chiude solo il server (manutenzione,
 // API esterna o comando sul server).
-import { app, getDB } from '../app.js';
+import { app, getDB, getManager, go, exitMaintenance } from '../app.js';
 import { api } from '../api.js';
 
 export const POLL_MS = 10000;
@@ -29,9 +29,24 @@ async function apply(next) {
 export async function checkEmergency() {
   try {
     const r = await api('/api/emergency', { timeoutMs: 6000 });
-    if (r.ok) await apply(normalize(r.data));
+    if (r.ok) {
+      await apply(normalize(r.data));
+      for (const c of r.data.commands || []) runCommand(c.action);
+    }
   } catch {
     // offline: resta l'ultimo stato noto
+  }
+}
+
+/** Comandi dalla manutenzione (Dispositivi → Controllo): elenco chiuso. */
+export function runCommand(action) {
+  if (action === 'ricarica') location.reload();
+  else if (action === 'home') {
+    if (app.get().maint) exitMaintenance();
+    go('home');
+  } else if (action === 'sincronizza') {
+    const m = getManager();
+    if (m) m.syncNow({ manual: true });
   }
 }
 

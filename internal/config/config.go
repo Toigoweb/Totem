@@ -139,6 +139,15 @@ type Device struct {
 	UltimoContatto time.Time `json:"ultimoContatto,omitempty"`
 	// Kiosk: app kiosk del tablet controllabile dal server (oggi solo FreeKiosk).
 	Kiosk *Kiosk `json:"kiosk,omitempty"`
+	// Agente: script sul PC Windows che riferisce lo stato e riceve i comandi.
+	Agente *Agent `json:"agente,omitempty"`
+}
+
+// Agent è l'agente del PC Windows (deploy/windows/totem-agente.ps1). È il PC a chiamare il
+// server con il suo token: sul PC non si apre nessuna porta.
+type Agent struct {
+	TokenHash    string `json:"tokenHash"`
+	SchermoNotte bool   `json:"schermoNotte"` // spegne lo schermo nell'orario notturno
 }
 
 // Kiosk collega un dispositivo all'API REST dell'app kiosk che lo ospita.

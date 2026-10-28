@@ -1,15 +1,10 @@
-// Manutenzione → Dispositivi → Tablet: collegamento all'API di FreeKiosk, stato, comandi.
-import { useEffect, useState } from 'preact/hooks';
+// Manutenzione → Dispositivi → Controllo: tablet con FreeKiosk (API REST), stato, comandi.
+import { useState } from 'preact/hooks';
 import { Icon } from '../components/Icon.jsx';
-import { TopBar, MaintBand, Toggle } from '../components/TopBar.jsx';
+import { Toggle } from '../components/TopBar.jsx';
 import { S } from '../strings.js';
-import { app, go, exitMaintenance, maintApi, setToast } from '../app.js';
+import { app, maintApi, setToast } from '../app.js';
 import { fmtWhen } from '../format.js';
-
-const exit = () => {
-  exitMaintenance();
-  go('home');
-};
 
 // stesse regole del server (internal/kiosk.NormalizeAddress), porta facoltativa
 const ADDR = /^[A-Za-z0-9]([A-Za-z0-9.-]{0,251}[A-Za-z0-9])?(:\d{1,5})?$/;
@@ -19,44 +14,23 @@ function Row({ label, children, testid }) {
   return <div class="tab-riga" data-testid={testid}><span class="l">{label}</span><span class="v">{children}</span></div>;
 }
 
-export function KioskDevice({ id }) {
-  const [dev, setDev] = useState(null);
-  const [night, setNight] = useState('20:00-06:00');
-  const [f, setF] = useState(null);
+/** Tablet con FreeKiosk collegato al dispositivo: stato, comandi, collegamento. */
+export function TabletPanel({ dev, night, reload }) {
+  const id = dev.id;
+  const init = () => ({
+    indirizzo: dev.kiosk ? dev.kiosk.indirizzo : '',
+    chiave: '',
+    schermoNotte: dev.kiosk ? dev.kiosk.schermoNotte : false,
+    luminositaAuto: dev.kiosk ? dev.kiosk.luminositaAuto : true,
+  });
+  const [f, setF] = useState(init);
   const [test, setTest] = useState({ status: 'idle' });
   const [err, setErr] = useState(null);
   const [confirm, setConfirm] = useState(null);
   const [shot, setShot] = useState(null);
   const [busy, setBusy] = useState(false);
 
-  const load = async () => {
-    try {
-      const [r, x] = await Promise.all([maintApi('/api/maint/devices'), maintApi('/api/maint/extras')]);
-      const d = (r.data.devices || []).find((y) => y.id === id) || null;
-      setDev(d);
-      if (x.ok && x.data.salvaschermo) setNight(x.data.salvaschermo.orarioNero || night);
-      setF((cur) => cur || {
-        indirizzo: d && d.kiosk ? d.kiosk.indirizzo : '',
-        chiave: '',
-        schermoNotte: d && d.kiosk ? d.kiosk.schermoNotte : false,
-        luminositaAuto: d && d.kiosk ? d.kiosk.luminositaAuto : true,
-      });
-    } catch {
-      setErr(S.maintOffline);
-    }
-  };
-  useEffect(() => {
-    load();
-    const t = setInterval(load, 15000);
-    return () => clearInterval(t);
-  }, [id]);
-
-  if (!dev || !f) {
-    return (
-      <div class="screen"><TopBar left="back" onBack={() => go('devices')} title={S.tabButton} right={null} /><MaintBand onExit={exit} />
-        <div class="body">{err ? <div class="banner rosso"><Icon name="errore" /><div>{err}</div></div> : <p>{S.maintLoading}</p>}</div></div>
-    );
-  }
+  const load = reload;
   const k = dev.kiosk;
   const set = (key) => (v) => setF((x) => ({ ...x, [key]: v }));
   const addrOk = validTabletAddress(f.indirizzo);
@@ -81,7 +55,7 @@ export function KioskDevice({ id }) {
       if (r.ok) {
         setToast(S.saved2);
         setF((x) => ({ ...x, chiave: '' }));
-        if (remove) setF(null);
+        if (remove) setF(init());
         setTimeout(load, 1500);
       } else setErr(S.tabErr[r.data.field] || S.saveErr);
     } catch {
@@ -118,16 +92,15 @@ export function KioskDevice({ id }) {
 
   const st = k && k.stato;
   return (
-    <div class="screen" data-testid="kiosk-device">
-      <TopBar left="back" onBack={() => go('devices')} title={S.tabTitle(dev.nome)} right={null} />
-      <MaintBand onExit={exit} />
-      <div class="body">
+    <section class="ctl-blocco" data-testid="kiosk-device">
+      <h2 class="blocco-tit">{S.tabButton}</h2>
+      <div>
         <p class="piccolo">{S.tabHelp}</p>
         {err && <div class="banner rosso" data-testid="kiosk-err"><Icon name="errore" /><div>{err}</div></div>}
 
         {k && st && (
           <>
-            <h2 class="blocco-tit">{S.tabState}</h2>
+            <h3>{S.tabState}</h3>
             {st.issues.map((is) => (
               <div key={is.code} class={`banner ${is.error ? 'rosso' : ''}`} data-testid="kiosk-issue"><Icon name={is.error ? 'errore' : 'avviso'} /><div>{is.text}</div></div>
             ))}
@@ -144,7 +117,7 @@ export function KioskDevice({ id }) {
               </div>
             )}
 
-            <h2 class="blocco-tit">{S.tabActions}</h2>
+            <h3>{S.tabActions}</h3>
             <div class="griglia-btn">
               {['ricarica', 'riavvia-app', 'schermo-on', 'schermo-off', 'posizione'].map((a) => (
                 <button key={a} class="btn" data-testid={`kiosk-act-${a}`} onClick={() => action(a)}><Icon name={a === 'posizione' ? 'mappa' : 'sync'} />{S.tabAct[a]}</button>
@@ -157,8 +130,7 @@ export function KioskDevice({ id }) {
           </>
         )}
 
-        <h2 class="blocco-tit">{S.tabButton}</h2>
-        <div class="form">
+        <div class="form" style={{ marginTop: '16px' }}>
           <div class="campo">
             <label for="k-addr">{S.tabAddr}</label>
             <input id="k-addr" class={`input mono ${f.indirizzo && !addrOk ? 'err' : ''}`} value={f.indirizzo} placeholder="192.168.2.60:8080" autocomplete="off" spellcheck={false}
@@ -206,6 +178,6 @@ export function KioskDevice({ id }) {
           </div>
         </div>
       )}
-    </div>
+    </section>
   );
 }

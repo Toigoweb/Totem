@@ -38,6 +38,7 @@ import (
 	"github.com/toigoweb/totem/internal/emergency"
 	"github.com/toigoweb/totem/internal/graphsrc"
 	"github.com/toigoweb/totem/internal/kiosk"
+	"github.com/toigoweb/totem/internal/pcagent"
 	"github.com/toigoweb/totem/internal/safety"
 	"github.com/toigoweb/totem/internal/scanner"
 	"github.com/toigoweb/totem/internal/synclog"
@@ -82,10 +83,12 @@ func main() {
 		os.Exit(statusText())
 	case "emergenza":
 		os.Exit(emergencyCmd(args))
+	case "token-agente":
+		os.Exit(agentTokenCmd(args))
 	case "version", "--version", "-v":
 		fmt.Println(version.Version)
 	default:
-		fmt.Fprintf(os.Stderr, "comando sconosciuto %q (serve | healthcheck | stato | scan | abbina-postazione [--nome N] | abbina-totem [--reparto R] | emergenza avvia|termina | reset-pairing [--reset-pin] | version)\n", cmd)
+		fmt.Fprintf(os.Stderr, "comando sconosciuto %q (serve | healthcheck | stato | scan | abbina-postazione [--nome N] | abbina-totem [--reparto R] | emergenza avvia|termina | token-agente --dispositivo D | reset-pairing [--reset-pin] | version)\n", cmd)
 		os.Exit(2)
 	}
 }
@@ -171,7 +174,7 @@ func serve() int {
 	}
 	km := kiosk.New(kiosk.Options{Config: store, Cipher: ci, Logger: logger, EmergencyActive: em.Active})
 	srv := api.New(api.Options{Config: store, Cipher: ci, Scanner: sc, Log: syncLog, Settings: settings, DataDir: dataDir,
-		Safety: saf, Kiosk: km, Emergency: em, Static: web.Dist(), Version: version.Version, Logger: logger})
+		Safety: saf, Kiosk: km, Emergency: em, Agents: pcagent.New(nil, logger), Static: web.Dist(), Version: version.Version, Logger: logger})
 	srv.EnsureSetupCode()
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -410,5 +413,33 @@ func emergencyCmd(args []string) int {
 	} else {
 		fmt.Println("Emergenza terminata.")
 	}
+	return 0
+}
+
+// agentTokenCmd genera il token dell'agente di un PC (lo stesso di Manutenzione →
+// Dispositivi → PC Windows): totem token-agente --dispositivo "totem magazzino"
+func agentTokenCmd(args []string) int {
+	fs := flag.NewFlagSet("token-agente", flag.ContinueOnError)
+	dev := fs.String("dispositivo", "", "nome o id del dispositivo (come in Manutenzione → Dispositivi)")
+	if err := fs.Parse(args); err != nil || *dev == "" {
+		fmt.Fprintln(os.Stderr, "uso: totem token-agente --dispositivo NOME")
+		return 2
+	}
+	c := &http.Client{Timeout: 5 * time.Second}
+	resp, err := c.Post(internalURL("/internal/agent-token?dispositivo="+url.QueryEscape(*dev)), "application/json", bytes.NewReader(nil))
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "token-agente: server non raggiungibile:", err)
+		return 1
+	}
+	defer resp.Body.Close()
+	var out struct {
+		Token       string `json:"token"`
+		Dispositivo string `json:"dispositivo"`
+	}
+	if resp.StatusCode != http.StatusOK || json.NewDecoder(resp.Body).Decode(&out) != nil {
+		fmt.Fprintf(os.Stderr, "token-agente: dispositivo %q non trovato (HTTP %d)\n", *dev, resp.StatusCode)
+		return 1
+	}
+	fmt.Printf("Token dell'agente per %q (mostrato una sola volta):\n%s\n", out.Dispositivo, out.Token)
 	return 0
 }

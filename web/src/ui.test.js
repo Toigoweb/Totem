@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { pillState, recentDocs, activeNotices } from './app.js';
+import { pillState, recentDocs, activeNotices, browserName, describeView } from './app.js';
 import { screensaverMode } from './kiosk/Screensaver.jsx';
 import { inWindow, shouldApply } from './kiosk/updates.js';
 import { validPath, validUser, checkSource } from './screens/SectionForm.jsx';
@@ -170,5 +170,21 @@ describe('emergenza e tablet', () => {
   it('indirizzo del tablet', () => {
     for (const ok of ['192.168.2.60', '192.168.2.60:8080', 'tablet-1.local:9000']) expect(validTabletAddress(ok)).toBe(true);
     for (const ko of ['http://192.168.2.60', '192.168.2.60:0', '192.168.2.60:70000', 'a b', '']) expect(validTabletAddress(ko)).toBe(false);
+  });
+});
+
+describe('dati del dispositivo per il server', () => {
+  it('browser', () => {
+    expect(browserName('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36')).toBe('Chrome 131');
+    expect(browserName('Mozilla/5.0 (Linux; Android 14; SM-X210; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/130.0.0.0 Safari/537.36')).toBe('WebView 130');
+    expect(browserName('Mozilla/5.0 Firefox/130')).toBe('');
+  });
+  it('cosa mostra', () => {
+    const base = { emergency: null, maint: null, docs: [{ id: 's/a.pdf', title: 'Acetone' }], sections: [{ id: 's', name: 'Schede' }] };
+    expect(describeView({ ...base, route: { name: 'home' } })).toBe('Home');
+    expect(describeView({ ...base, route: { name: 'reader', id: 's/a.pdf' } })).toBe('Documento: Acetone');
+    expect(describeView({ ...base, route: { name: 'section', id: 's' } })).toBe('Sezione: Schede');
+    expect(describeView({ ...base, maint: { token: 'x' }, route: { name: 'devices' } })).toBe('Manutenzione');
+    expect(describeView({ ...base, emergency: { title: 'Evacuazione' }, route: { name: 'home' } })).toBe('Emergenza: Evacuazione');
   });
 });

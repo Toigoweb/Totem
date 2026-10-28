@@ -72,14 +72,31 @@ Lo script:
   watchdog lo riapre. È anche il momento in cui si applicano gli aggiornamenti dell'app;
 - imposta l'alimentazione: mai sospensione né ibernazione, schermo sempre acceso.
 
-Per lo schermo con orari (spento di notte) usare invece una coppia di attività pianificate
-con `powercfg`, oppure lo spegnimento programmato del monitor se lo supporta.
+**Agente del PC (consigliato).** Con l'agente il server vede lo stato del PC e può
+comandarlo (README, "PC Windows: agente e controllo"):
+- ☐ Dopo la procedura guidata: Manutenzione → Dispositivi → **Controllo** sulla riga del
+  totem → **Genera token dell'agente** e copiare il comando mostrato.
+- ☐ Rilanciare da amministratore `installa-kiosk.ps1` con `-TokenAgente <token>`: crea
+  l'attività **"Totem - agente"** e salva il token in `C:\TotemKiosk\agente.token`
+  (leggibile solo da `totem` e dagli amministratori).
+- ☐ Disconnettersi e riaccedere come `totem` (o riavviare): entro un minuto Controllo
+  mostra Windows, Chrome "in esecuzione" e l'alimentazione.
+- ☐ Prova **Screenshot**; con gli altoparlanti, prova di emergenza in orario concordato
+  (annuncio in italiano: serve la voce italiana di Windows, presente sui Windows in
+  italiano; altrimenti Impostazioni → Ora e lingua → Voce → Aggiungi voci → Italiano).
+- ☐ Facoltativo: **Spegni lo schermo di notte** nella stessa schermata (al posto di
+  orari con `powercfg`).
+
+Il log dell'agente è in `C:\TotemKiosk\agente.log`.
 
 Il log del watchdog è in `C:\TotemKiosk\watchdog.log`.
 
 Gli script sono provati a ogni push dalla CI su un Windows vero (job `windows-kiosk`):
 - sintassi e codifica leggibile da Windows PowerShell 5.1;
-- installazione per un utente di prova, con le due attività pianificate;
+- installazione per un utente di prova, con le tre attività pianificate e i permessi del
+  token dell'agente;
+- agente contro il server vero (compilato sul momento): stato del PC ricevuto e
+  segnalato, prova locale dello screenshot;
 - avvio di Chrome con il profilo del totem e riapertura dopo la chiusura.
 
 Restano da provare sul posto Autologon, i criteri di gruppo e il comportamento con uno

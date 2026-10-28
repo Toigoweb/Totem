@@ -290,3 +290,36 @@ come riferimento"). Il token per avviare l'emergenza da sistemi esterni è in
 e lo conservano in IndexedDB (`meta.emergency`). Non passa dal manifest: deve arrivare in
 pochi secondi, non alla sync successiva.
 
+## Agente del PC e segnale periodico
+
+Un dispositivo può avere l'agente del PC Windows:
+
+```json
+"agente": { "tokenHash": "e3b0c442…(sha256 del token)", "schermoNotte": true }
+```
+
+L'agente chiama `POST /api/agent/report` con `Authorization: Bearer <token>`:
+
+```json
+{ "versione": "1.0", "chrome": true, "rete": true, "batteria": null, "uptimeMin": 1440,
+  "discoLiberoMB": 51200, "riavvioInAttesa": false, "windows": "Windows 11 Pro 24H2 (26100)",
+  "schermoSpento": false, "fatti": [{ "id": "c_x1", "ok": true }] }
+```
+
+e riceve i comandi in coda (consegnati una volta sola), lo stato voluto dello schermo e
+l'eventuale emergenza:
+
+```json
+{ "comandi": [{ "id": "c_x2", "azione": "screenshot" }], "schermoSpento": false, "intervalloSec": 30,
+  "emergenza": { "id": "em_k3v9q2", "titolo": "Evacuazione", "testo": "Lasciare l'edificio…" } }
+```
+
+`azione`: `riavvia-chrome`, `riavvia-pc`, `schermo-on`, `schermo-off`, `screenshot` (il PNG
+va a `POST /api/agent/screenshot`), `annuncio` (con `testo`). Lo stato degli agenti resta in
+memoria sul server.
+
+Il segnale periodico dell'app (`POST /api/heartbeat`) porta in più, facoltativi:
+`battery` (`{ "level": 0-100, "charging": bool }`, solo se il dispositivo ha una batteria),
+`browser` (es. "Chrome 131") e `view` (es. "Documento: Acetone"). I comandi all'app
+(`ricarica`, `home`, `sincronizza`) arrivano nel campo `commands` di `GET /api/emergency`.
+

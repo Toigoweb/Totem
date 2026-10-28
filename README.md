@@ -489,6 +489,53 @@ messaggio di **evacuazione** (testo predefinito modificabile) o un **avviso urge
 - Il totem **affianca** l'impianto di allarme e le procedure di emergenza: non è un
   sistema di allarme certificato e non va usato al posto delle sirene.
 
+### Controllo dei dispositivi e PC Windows con agente
+
+Manutenzione → Dispositivi → **Controllo** sulla riga di un totem o di una postazione
+riunisce tutto quello che si sa del dispositivo:
+
+- **App del totem** (sempre, senza installare nulla): ultimo contatto, versione dell'app,
+  versione di Chrome o della WebView, **cosa mostra** (Home, documento aperto, emergenza),
+  documenti e spazio, **batteria** se il dispositivo ne ha una (portatili, all-in-one,
+  tablet Windows: avviso "scollegato dalla corrente" dopo 10 minuti). Comandi:
+  **ricarica pagina**, **torna alla Home**, **sincronizza ora** (arrivano entro 10 secondi).
+- **PC Windows (agente)**, vedi sotto.
+- **Tablet FreeKiosk**, vedi il paragrafo successivo.
+
+**Agente del PC Windows.** È lo script `deploy/windows/totem-agente.ps1`: gira nella
+sessione dell'utente del totem e ogni 30 secondi manda al server lo stato del PC e riceve
+i comandi. È il PC a chiamare il server: sul PC non si apre nessuna porta e non serve un
+IP fisso.
+
+- Stato: versione di Windows, Chrome del totem in esecuzione, alimentazione (rete o
+  batteria; un UPS collegato in USB compare come batteria), spazio su disco, tempo
+  dall'accensione, **aggiornamenti di Windows in attesa di riavvio**, schermo.
+- Avvisi (anche nella pagina di monitoraggio): PC non raggiungibile da 3 minuti, Chrome
+  non in esecuzione, scollegato dalla corrente da 10 minuti, batteria sotto il 20%
+  (errori); disco sotto 2 GB, aggiornamenti in attesa di riavvio (avvisi).
+- Comandi: riavvia Chrome, riavvia PC (30 secondi di preavviso), spegni/accendi schermo,
+  **screenshot** dello schermo del PC. L'elenco è chiuso: il server non può far eseguire
+  altro al PC.
+- **Schermo spento di notte** nell'orario notturno del salvaschermo (un tocco lo riaccende;
+  si rispegne dopo 10 minuti).
+- **Emergenza**: schermo acceso, volume al massimo, segnale e **annuncio vocale** del
+  messaggio con la voce italiana di Windows. Servono altoparlanti o un monitor con audio.
+- Non si leggono temperatura (Windows non la espone in modo affidabile) né posizione.
+
+Installazione: Controllo → **Genera token dell'agente**, poi sul PC, da amministratore:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File installa-kiosk.ps1 -Url https://totem.azienda.it -Utente totem -TokenAgente <token>
+```
+
+Il token si vede una sola volta; si può rigenerare (il vecchio smette di valere) o
+generare dal server con `docker compose exec totem /totem token-agente --dispositivo "nome"`.
+Prova locale sul PC, senza server: `C:\TotemKiosk\totem-agente.ps1 -Server x -Prova`
+(stampa lo stato e salva uno screenshot in `%TEMP%`). Log: `C:\TotemKiosk\agente.log`.
+
+L'agente si fida dello stesso certificato di Chrome: la CA interna deve essere tra le
+*Autorità di certificazione radice attendibili* del computer.
+
 ### Tablet Android con FreeKiosk
 
 [FreeKiosk](https://github.com/rushb-fr/freekiosk) è un'app kiosk open source e gratuita

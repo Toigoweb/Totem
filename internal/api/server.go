@@ -18,6 +18,7 @@ import (
 	"github.com/toigoweb/totem/internal/config"
 	"github.com/toigoweb/totem/internal/emergency"
 	"github.com/toigoweb/totem/internal/kiosk"
+	"github.com/toigoweb/totem/internal/pcagent"
 	"github.com/toigoweb/totem/internal/safety"
 	"github.com/toigoweb/totem/internal/scanner"
 	"github.com/toigoweb/totem/internal/smbsrc"
@@ -54,7 +55,8 @@ type Options struct {
 	// Kiosk: tablet con app kiosk controllabile (facoltativo); Emergency: modalità emergenza
 	Kiosk     *kiosk.Manager
 	Emergency *emergency.Store
-	Static    fs.FS // contenuto di web/dist
+	Agents    *pcagent.Manager // agenti dei PC Windows (facoltativo)
+	Static    fs.FS            // contenuto di web/dist
 	Version   string
 	Logger    *slog.Logger
 	Now       func() time.Time
@@ -68,6 +70,7 @@ type Server struct {
 	monitorLimiter *auth.Limiter
 	// token di emergenza sbagliati: blocco come il PIN
 	emergencyLimiter *auth.Limiter
+	agentLimiter     *auth.Limiter
 	maint            *auth.Sessions // valore: id del dispositivo
 	setup            *auth.Sessions // valore: "setup"
 
@@ -76,7 +79,8 @@ type Server struct {
 	tests     map[string]testGrant // prove di connessione riuscite
 	pairCodes map[string]pairGrant // codici di abbinamento di postazioni e telefoni
 	lastKick  time.Time
-	lastSeen  map[string]time.Time // ultimo salvataggio di ultimoContatto per dispositivo
+	lastSeen  map[string]time.Time    // ultimo salvataggio di ultimoContatto per dispositivo
+	appCmds   map[string][]appCommand // comandi per l'app dei dispositivi, consegnati una volta
 }
 
 func New(o Options) *Server {
@@ -93,13 +97,16 @@ func New(o Options) *Server {
 		// il monitoraggio interroga spesso: blocco solo dopo molti token sbagliati
 		monitorLimiter:   auth.NewLimiter(20, o.Settings.PinLockout),
 		emergencyLimiter: auth.NewLimiter(o.Settings.PinAttempts, o.Settings.PinLockout),
-		maint:            auth.NewSessions(o.Settings.MaintenanceIdle, 0),
-		setup:            auth.NewSessions(15*time.Minute, 30*time.Minute),
-		tests:            map[string]testGrant{},
-		pairCodes:        map[string]pairGrant{},
-		lastSeen:         map[string]time.Time{},
+		// gli agenti chiamano ogni 30 s: blocco solo dopo molti token sbagliati
+		agentLimiter: auth.NewLimiter(20, o.Settings.PinLockout),
+		maint:        auth.NewSessions(o.Settings.MaintenanceIdle, 0),
+		setup:        auth.NewSessions(15*time.Minute, 30*time.Minute),
+		tests:        map[string]testGrant{},
+		pairCodes:    map[string]pairGrant{},
+		lastSeen:     map[string]time.Time{},
+		appCmds:      map[string][]appCommand{},
 	}
-	s.pinLimiter.Now, s.codeLimiter.Now, s.monitorLimiter.Now, s.emergencyLimiter.Now = o.Now, o.Now, o.Now, o.Now
+	s.pinLimiter.Now, s.codeLimiter.Now, s.monitorLimiter.Now, s.emergencyLimiter.Now, s.agentLimiter.Now = o.Now, o.Now, o.Now, o.Now, o.Now
 	s.maint.Now, s.setup.Now = o.Now, o.Now
 	return s
 }
@@ -125,6 +132,8 @@ func (s *Server) Handler() http.Handler {
 	m.Handle("GET /api/emergency", s.device(http.HandlerFunc(s.getEmergency)))
 	m.HandleFunc("POST /api/emergency/start", s.apiEmergency(true))
 	m.HandleFunc("POST /api/emergency/stop", s.apiEmergency(false))
+	m.HandleFunc("POST /api/agent/report", s.agentReport)
+	m.HandleFunc("POST /api/agent/screenshot", s.agentScreenshot)
 	m.Handle("POST /api/maint/login", s.staffOnly(http.HandlerFunc(s.maintLogin)))
 
 	// manutenzione (PIN)
@@ -153,6 +162,12 @@ func (s *Server) Handler() http.Handler {
 	m.Handle("POST /api/maint/devices/{id}/kiosk/{azione}", s.maintOnly(http.HandlerFunc(s.kioskAction)))
 	m.Handle("GET /api/maint/devices/{id}/kiosk/screenshot", s.maintOnly(http.HandlerFunc(s.kioskScreenshot)))
 	m.Handle("POST /api/maint/kiosk/test", s.maintOnly(http.HandlerFunc(s.testKiosk)))
+	m.Handle("POST /api/maint/devices/{id}/agent/token", s.maintOnly(http.HandlerFunc(s.maintAgentToken)))
+	m.Handle("PUT /api/maint/devices/{id}/agent", s.maintOnly(http.HandlerFunc(s.maintAgentPut)))
+	m.Handle("DELETE /api/maint/devices/{id}/agent", s.maintOnly(http.HandlerFunc(s.maintAgentDelete)))
+	m.Handle("POST /api/maint/devices/{id}/agent/cmd/{azione}", s.maintOnly(http.HandlerFunc(s.maintAgentCmd)))
+	m.Handle("GET /api/maint/devices/{id}/agent/screenshot", s.maintOnly(http.HandlerFunc(s.maintAgentScreenshot)))
+	m.Handle("POST /api/maint/devices/{id}/app/{azione}", s.maintOnly(http.HandlerFunc(s.maintAppCmd)))
 	m.Handle("GET /api/maint/emergency", s.maintOnly(http.HandlerFunc(s.maintEmergency)))
 	m.Handle("POST /api/maint/emergency/start", s.maintOnly(http.HandlerFunc(s.maintEmergencyStart)))
 	m.Handle("POST /api/maint/emergency/stop", s.maintOnly(http.HandlerFunc(s.maintEmergencyStop)))

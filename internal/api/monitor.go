@@ -51,6 +51,7 @@ type monitorReport struct {
 	Totems          []monitorDevice  `json:"totems"`
 	Discarded       int              `json:"discardedDocuments"`
 	Tablets         []kiosk.Issue    `json:"tablets"`
+	PCs             []kiosk.Issue    `json:"pcs"`
 	Emergency       *emergencyOut    `json:"emergency,omitempty"`
 	Problems        []string         `json:"problems"`
 	Warnings        []string         `json:"warnings"`
@@ -111,6 +112,17 @@ func (s *Server) monitorReport() monitorReport {
 			} else {
 				rep.Warnings = append(rep.Warnings, msg)
 			}
+		}
+	}
+	// PC Windows: dall'agente; batteria segnalata dall'app per chi non ha l'agente
+	rep.PCs = append(s.pcIssues(cfg), s.appIssues(cfg)...)
+	for _, is := range rep.PCs {
+		msg := fmt.Sprintf("dispositivo %q: %s", is.Device, is.Text)
+		if is.Error {
+			rep.OK = false
+			rep.Problems = append(rep.Problems, msg)
+		} else {
+			rep.Warnings = append(rep.Warnings, msg)
 		}
 	}
 	if s.o.Emergency != nil {

@@ -90,12 +90,18 @@ jobs:
         run: |
           $pw = ConvertTo-SecureString 'Kx7#pQ2!wZ9m-Lr4' -AsPlainText -Force
           New-LocalUser -Name totem -Password $pw -PasswordNeverExpires | Out-Null
-          powershell -NoProfile -ExecutionPolicy Bypass -File deploy/windows/installa-kiosk.ps1 -Url https://totem.example.invalid -Utente totem
+          powershell -NoProfile -ExecutionPolicy Bypass -File deploy/windows/installa-kiosk.ps1 -Url https://totem.example.invalid/ -Utente totem -TokenAgente token-di-prova
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
-          $t = Get-ScheduledTask -TaskName 'Totem - kiosk', 'Totem - riavvio notturno browser'
+          $t = Get-ScheduledTask -TaskName 'Totem - kiosk', 'Totem - riavvio notturno browser', 'Totem - agente'
           $t | Format-Table TaskName, State, @{n='Utente';e={$_.Principal.UserId}}
-          if ($t.Count -ne 2) { throw 'attività pianificate mancanti' }
+          if ($t.Count -ne 3) { throw 'attività pianificate mancanti' }
           if (-not (Test-Path C:\TotemKiosk\totem-kiosk.ps1)) { throw 'watchdog non copiato' }
+          if (-not (Test-Path C:\TotemKiosk\totem-agente.ps1)) { throw 'agente non copiato' }
+          $acl = (Get-Acl C:\TotemKiosk\agente.token).Access | ForEach-Object { $_.IdentityReference.Value }
+          Write-Host "Permessi del token: $($acl -join ', ')"
+          if ($acl | Where-Object { $_ -match 'Users|Utenti|Everyone' }) { throw 'token leggibile da tutti gli utenti' }
+          $arg = (Get-ScheduledTask -TaskName 'Totem - agente').Actions[0].Arguments
+          if ($arg -notmatch '-Server "https://totem.example.invalid"') { throw "indirizzo del server errato: $arg" }
 
       - name: Il watchdog avvia Chrome e lo riapre
         shell: powershell
@@ -112,6 +118,38 @@ jobs:
           Get-Content C:\TotemKiosk\watchdog.log
           Stop-Process -Id $w.Id -Force
           Stop-Process -Name chrome -Force -ErrorAction SilentlyContinue
+
+      - uses: actions/setup-go@v6
+        with: { go-version-file: go.mod }
+
+      - name: Agente del PC contro il server vero
+        shell: powershell
+        run: |
+          go build -o totem.exe ./cmd/totem
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $d = Join-Path $env:RUNNER_TEMP 'totem'
+          New-Item -ItemType Directory -Force "$d\data", "$d\secrets" | Out-Null
+          '{"schemaVersion":2,"sezioni":[],"globali":{"fase2":false,"dispositivi":[{"id":"d_pc","nome":"totem prova","ruolo":"totem","piattaforma":"windows","tokenHash":"x","creato":"2026-01-01T00:00:00Z"}]}}' |
+            Set-Content "$d\data\config.json" -Encoding ASCII
+          $env:TOTEM_DATA = "$d\data"; $env:TOTEM_SECRETS = "$d\secrets"
+          $env:TOTEM_ADDR = '127.0.0.1:18080'; $env:TOTEM_INTERNAL_ADDR = '127.0.0.1:18081'
+          $srv = Start-Process .\totem.exe -PassThru -RedirectStandardOutput "$d\server.log" -RedirectStandardError "$d\server.err"
+          Start-Sleep -Seconds 3
+          $out = .\totem.exe token-agente --dispositivo 'totem prova'
+          if ($LASTEXITCODE) { Get-Content "$d\server.log"; throw 'token non generato' }
+          Set-Content C:\TotemKiosk\agente.token ($out | Select-Object -Last 1) -Encoding ASCII
+          # due giri senza Chrome del totem: il server deve segnalarlo
+          foreach ($i in 1, 2) {
+            powershell -NoProfile -ExecutionPolicy Bypass -File C:\TotemKiosk\totem-agente.ps1 -Server http://127.0.0.1:18080 -Once -LogFile "$d\agente.log"
+          }
+          $mon = Invoke-RestMethod http://127.0.0.1:18081/internal/monitor
+          $mon.pcs | Format-Table device, code, text
+          Get-Content "$d\agente.log" -ErrorAction SilentlyContinue
+          if (-not ($mon.pcs | Where-Object { $_.code -eq 'chrome' })) { Get-Content "$d\server.log"; throw 'stato del PC non arrivato al server' }
+          # stato locale e screenshot
+          powershell -NoProfile -ExecutionPolicy Bypass -File C:\TotemKiosk\totem-agente.ps1 -Server x -Prova
+          if (-not (Test-Path "$env:TEMP\totem-agente-prova.png")) { throw 'screenshot non riuscito' }
+          Stop-Process -Id $srv.Id -Force
 
   image:
     runs-on: ubuntu-latest

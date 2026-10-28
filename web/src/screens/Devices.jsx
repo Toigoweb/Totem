@@ -89,6 +89,20 @@ export function Devices() {
                 {d.kiosk.stato.issues.length > 0 && ` · ${d.kiosk.stato.issues.map((i) => i.text).join(' · ')}`}
               </div>
             )}
+            {d.agent && (
+              <div class="piccolo" data-testid="device-pc">
+                <Icon name={d.agent.stato.issues.some((i) => i.error) ? 'errore' : d.agent.stato.ok ? 'spunta' : 'avviso'} />{' '}
+                {S.pcTitle}
+                {d.agent.stato.issues.length > 0 && ` · ${d.agent.stato.issues.map((i) => i.text).join(' · ')}`}
+              </div>
+            )}
+            {(d.view || d.battery || d.appIssues.length > 0) && (
+              <div class="piccolo" data-testid="device-app">
+                {d.view ? `${S.appView}: ${d.view}` : ''}
+                {d.battery ? ` · ${S.appBattery} ${Math.round(d.battery.level)}%${d.battery.charging ? '' : ` (${S.tabNotCharging})`}` : ''}
+                {d.appIssues.length > 0 && ` · ${d.appIssues.map((i) => i.text).join(' · ')}`}
+              </div>
+            )}
             {d.ruolo === 'totem' && reparti.length > 0 && (
               <label class="piccolo" style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '6px' }}>
                 {S.department}
@@ -102,7 +116,7 @@ export function Devices() {
           </div>
           <div class="b">
             {d.ruolo !== 'telefono' && (
-              <button class="btn" data-testid="open-tablet" onClick={() => go('kioskDevice', { id: d.id })}><Icon name="ingranaggio" />{S.tabButton}</button>
+              <button class="btn" data-testid="open-tablet" onClick={() => go('kioskDevice', { id: d.id })}><Icon name="ingranaggio" />{S.ctlButton}</button>
             )}
             {d.ruolo === 'totem' && (
               <button class="btn" onClick={() => go('pairStation', { kind: 'replace', target: d.id, targetName: d.nome })}><Icon name="sync" />{S.replaceTotem}</button>

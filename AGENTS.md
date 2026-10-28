@@ -56,6 +56,9 @@ verifica e li pubblica, il totem li conserva **offline** e li mostra anche senza
 - **Pagina in HTTP**: aperta senza HTTPS spiega che serve l'indirizzo di NPM.
 - **Emergenza**: evacuazione o avviso urgente a tutto schermo su tutti i dispositivi, da
   manutenzione, API con token o `totem emergenza avvia`; resta anche offline.
+- **Controllo dei dispositivi**: dall'app (batteria, browser, cosa mostra; comandi
+  ricarica/Home/sincronizza) e, sui PC Windows, dall'**agente** `totem-agente.ps1` (stato
+  del PC, comandi, screenshot, schermo di notte, annuncio vocale di emergenza).
 - **Tablet con FreeKiosk**: il server legge stato e posizione, segnala corrente,
   batteria, temperatura e spostamenti, invia comandi, spegne lo schermo di notte e fa
   leggere ad alta voce l'emergenza (README, "Tablet Android con FreeKiosk").
@@ -82,6 +85,8 @@ verifica e li pubblica, il totem li conserva **offline** e li mostra anche senza
    con `gofmt`; nessuna dipendenza nuova senza un motivo forte.
 8. **Script PowerShell** (`deploy/windows/*.ps1`): salvati in UTF-8 **con BOM**,
    altrimenti PowerShell 5.1 rovina le lettere accentate (c'è un controllo in CI).
+   Compatibili con Windows PowerShell 5.1 (quello di Windows 11), non solo con pwsh 7.
+   L'agente esegue solo l'elenco chiuso di comandi: non aggiungere esecuzioni arbitrarie.
 9. **Test**: ogni funzione nuova con test Go e/o Vitest e, se tocca il totem, un test
    end-to-end Playwright. La CI deve restare verde.
 

@@ -21,6 +21,7 @@ import (
 	"github.com/toigoweb/totem/internal/config"
 	"github.com/toigoweb/totem/internal/emergency"
 	"github.com/toigoweb/totem/internal/kiosk"
+	"github.com/toigoweb/totem/internal/pcagent"
 	"github.com/toigoweb/totem/internal/safety"
 	"github.com/toigoweb/totem/internal/scanner"
 	"github.com/toigoweb/totem/internal/smbsrc"
@@ -49,6 +50,7 @@ type harness struct {
 	saf   *safety.Store
 	em    *emergency.Store
 	km    *kiosk.Manager
+	ag    *pcagent.Manager
 	srv   *Server
 	ts    *httptest.Server
 	share string
@@ -84,9 +86,10 @@ func newHarness(t *testing.T) *harness {
 	}
 	h.saf, _ = safety.Open(h.data)
 	h.em, _ = emergency.Open(h.data)
+	h.ag = pcagent.New(h.clk.Now, lg)
 	h.km = kiosk.New(kiosk.Options{Config: h.cfg, Cipher: h.ci, Logger: lg, Now: h.clk.Now, EmergencyActive: h.em.Active})
 	h.saf.Now = h.clk.Now
-	h.srv = New(Options{Config: h.cfg, Cipher: h.ci, Scanner: h.sc, Log: sl, Settings: config.DefaultSettings(), DataDir: h.data, Safety: h.saf, Kiosk: h.km, Emergency: h.em,
+	h.srv = New(Options{Config: h.cfg, Cipher: h.ci, Scanner: h.sc, Log: sl, Settings: config.DefaultSettings(), DataDir: h.data, Safety: h.saf, Kiosk: h.km, Emergency: h.em, Agents: h.ag,
 		Version: "test", Logger: lg, Now: h.clk.Now})
 	h.srv.EnsureSetupCode()
 	h.ts = httptest.NewTLSServer(h.srv.Handler())

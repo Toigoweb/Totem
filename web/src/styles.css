@@ -381,3 +381,5 @@ body:has(.em-fascia) .screen { padding-bottom: 64px; }
 .tab-shot { max-width: min(100%, 900px); border: 2px solid var(--grigio-chiaro); border-radius: 8px; margin-top: 12px; }
 .em-attiva p { margin: 6px 0 0; }
 body:has(.em-fascia) .toast { bottom: 88px; z-index: 56; }
+.ctl-blocco { margin-bottom: 28px; }
+.ctl-blocco h3 { margin: 20px 0 8px; font-size: 1.05rem; }

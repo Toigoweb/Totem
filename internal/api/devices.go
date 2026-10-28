@@ -12,6 +12,7 @@ import (
 
 	"github.com/toigoweb/totem/internal/auth"
 	"github.com/toigoweb/totem/internal/config"
+	"github.com/toigoweb/totem/internal/kiosk"
 	"github.com/toigoweb/totem/internal/scanner"
 )
 
@@ -307,6 +308,13 @@ type deviceOut struct {
 	FreeBytes  *int64     `json:"freeBytes,omitempty"`
 	// tablet con app kiosk controllabile (FreeKiosk), se collegato
 	Kiosk *kioskOut `json:"kiosk,omitempty"`
+	// agente del PC Windows, se collegato
+	Agent *agentOut `json:"agent,omitempty"`
+	// dall'app (heartbeat): batteria del dispositivo, browser, cosa mostra
+	Battery   *batteryHB    `json:"battery,omitempty"`
+	Browser   string        `json:"browser,omitempty"`
+	View      string        `json:"view,omitempty"`
+	AppIssues []kiosk.Issue `json:"appIssues"`
 }
 
 func (s *Server) readHeartbeats() map[string]heartbeatReq {
@@ -341,6 +349,14 @@ func (s *Server) listDevices(w http.ResponseWriter, r *http.Request) {
 				o.Documents, o.FreeBytes = &n, &f
 			}
 			o.Kiosk = s.kioskOf(d)
+			o.Agent = s.agentOf(d)
+			o.AppIssues = []kiosk.Issue{}
+			if hb, ok := hbs[d.ID]; ok {
+				o.Battery, o.Browser, o.View = hb.Battery, hb.Browser, hb.View
+				if d.Agente == nil {
+					o.AppIssues = appIssuesOf(d, hb, s.o.Now())
+				}
+			}
 			out = append(out, o)
 		}
 	})

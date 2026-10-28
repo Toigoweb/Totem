@@ -2,19 +2,24 @@
   Prepara il PC Windows come totem (fase A). Da eseguire una volta, come amministratore:
 
     powershell -ExecutionPolicy Bypass -File installa-kiosk.ps1 -Url https://totem.azienda.it -Utente totem
+    (facoltativo, per il monitoraggio del PC)  -TokenAgente <token>
 
   Fa:
     - copia il watchdog in C:\TotemKiosk
     - attività pianificata all'accesso dell'utente del totem: avvio del watchdog
     - attività pianificata ogni notte alle 03:30: chiusura di Chrome (il watchdog lo riapre)
     - alimentazione: mai sospensione né ibernazione, schermo sempre acceso
+    - con -TokenAgente: agente del PC (stato, comandi, schermo di notte, annuncio vocale
+      di emergenza), token in C:\TotemKiosk\agente.token leggibile solo dall'utente del
+      totem e dagli amministratori. Il token si genera in Manutenzione → Dispositivi → PC
   Non fa (vedi docs/04-messa-in-servizio.md): creazione dell'utente, Autologon,
   criteri di gruppo, Windows Update.
 #>
 param(
   [Parameter(Mandatory = $true)][string]$Url,
   [string]$Utente = 'totem',
-  [string]$OraRiavvio = '03:30'
+  [string]$OraRiavvio = '03:30',
+  [string]$TokenAgente = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -43,7 +48,21 @@ $stop = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument '-NoProfile 
 $night = New-ScheduledTaskTrigger -Daily -At $OraRiavvio
 Register-ScheduledTask -TaskName 'Totem - riavvio notturno browser' -Action $stop -Trigger $night -Principal $principal -Settings $settings -Force | Out-Null
 
-# 3) alimentazione (rete elettrica)
+# 3) agente del PC (facoltativo)
+if ($TokenAgente) {
+  Copy-Item -Path (Join-Path $PSScriptRoot 'totem-agente.ps1') -Destination $dir -Force
+  $tf = Join-Path $dir 'agente.token'
+  Set-Content -Path $tf -Value $TokenAgente.Trim() -Encoding ASCII -NoNewline
+  # solo l'utente del totem (che esegue l'agente), SYSTEM e amministratori
+  icacls $tf /inheritance:r /grant:r "${env:COMPUTERNAME}\${Utente}:R" '*S-1-5-18:F' '*S-1-5-32-544:F' | Out-Null
+  $base = $Url -replace '^(https?://[^/]+).*$', '$1'
+  $pa = "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$dir\totem-agente.ps1`" -Server `"$base`""
+  $aact = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument $pa
+  Register-ScheduledTask -TaskName 'Totem - agente' -Action $aact -Trigger $trg -Principal $principal -Settings $settings -Force | Out-Null
+  Write-Host "Agente del PC installato: compare in Manutenzione → Dispositivi entro un minuto dall'accesso."
+}
+
+# 4) alimentazione (rete elettrica)
 powercfg /change standby-timeout-ac 0
 powercfg /change hibernate-timeout-ac 0
 powercfg /change monitor-timeout-ac 0

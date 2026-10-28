@@ -46,6 +46,25 @@ type heartbeatReq struct {
 	Documents  int       `json:"documents"`
 	FreeBytes  int64     `json:"freeBytes"`
 	UsedBytes  int64     `json:"usedBytes"`
+	// facoltativi: batteria (portatili, all-in-one, tablet Windows), browser, cosa mostra
+	Battery *batteryHB `json:"battery,omitempty"`
+	Browser string     `json:"browser,omitempty"`
+	View    string     `json:"view,omitempty"`
+	// calcolati dal server
+	ReceivedAt       time.Time `json:"receivedAt"`
+	NotChargingSince time.Time `json:"notChargingSince,omitempty"`
+}
+
+type batteryHB struct {
+	Level    float64 `json:"level"` // 0-100
+	Charging bool    `json:"charging"`
+}
+
+func clip(s string, n int) string {
+	if r := []rune(s); len(r) > n {
+		return string(r[:n])
+	}
+	return s
 }
 
 func validPlatform(p string) string {
@@ -65,6 +84,10 @@ func (s *Server) heartbeat(w http.ResponseWriter, r *http.Request) {
 		hb.AppVersion = hb.AppVersion[:40]
 	}
 	hb.Platform = validPlatform(hb.Platform)
+	hb.Browser, hb.View = clip(hb.Browser, 40), clip(hb.View, 120)
+	if hb.Battery != nil && (hb.Battery.Level < 0 || hb.Battery.Level > 100) {
+		hb.Battery = nil
+	}
 	d := deviceFrom(r)
 	now := s.o.Now()
 	// ultimoContatto in config.json al massimo una volta al minuto
@@ -93,12 +116,19 @@ func (s *Server) saveHeartbeat(id string, hb heartbeatReq, now time.Time) {
 	p := filepath.Join(s.o.DataDir, "state", "heartbeat.json")
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	all := map[string]any{}
+	all := map[string]heartbeatReq{}
 	if b, err := os.ReadFile(p); err == nil {
 		_ = json.Unmarshal(b, &all)
 	}
-	all[id] = map[string]any{"receivedAt": now, "appVersion": hb.AppVersion, "platform": hb.Platform,
-		"lastSync": hb.LastSync, "documents": hb.Documents, "freeBytes": hb.FreeBytes, "usedBytes": hb.UsedBytes}
+	hb.ReceivedAt = now
+	// da quando il dispositivo non è in carica (per l'avviso "scollegato dalla corrente")
+	if hb.Battery != nil && !hb.Battery.Charging {
+		hb.NotChargingSince = now
+		if prev, ok := all[id]; ok && prev.Battery != nil && !prev.Battery.Charging && !prev.NotChargingSince.IsZero() {
+			hb.NotChargingSince = prev.NotChargingSince
+		}
+	}
+	all[id] = hb
 	b, _ := json.MarshalIndent(all, "", "  ")
 	_ = config.WriteFileAtomic(p, b, 0o600)
 }

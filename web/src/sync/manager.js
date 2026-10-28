@@ -20,6 +20,8 @@ export function createSyncManager(o) {
   const appVersion = o.appVersion || 'dev';
   const run = o.runSync || runSync;
   const estimate = o.estimate || (() => (navigator.storage && navigator.storage.estimate ? navigator.storage.estimate() : Promise.resolve({})));
+  // dati facoltativi del dispositivo: batteria, browser, cosa mostra (vedi app.js)
+  const extra = o.heartbeatExtra || (async () => ({}));
 
   let state = { running: false, progress: null, lastResult: null, lastError: null, nextAt: null, online: true };
   const listeners = new Set();
@@ -84,6 +86,7 @@ export function createSyncManager(o) {
         documents: docs.length,
         freeBytes: est && est.quota != null ? Math.max(0, est.quota - (est.usage || 0)) : 0,
         usedBytes: (est && est.usage) || 0,
+        ...(await extra().catch(() => ({}))),
       };
       await doFetch('/api/heartbeat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), credentials: 'same-origin' });
     } catch {

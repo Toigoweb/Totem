@@ -35,12 +35,17 @@ func emergencyView(s emergency.State) emergencyOut {
 }
 
 // getEmergency: per i dispositivi abbinati.
+// Nella stessa risposta arrivano i comandi per l'app del dispositivo (ricarica, Home,
+// sincronizza), così basta una sola richiesta ogni 10 secondi.
 func (s *Server) getEmergency(w http.ResponseWriter, r *http.Request) {
-	if s.o.Emergency == nil {
-		writeJSON(w, http.StatusOK, emergencyOut{})
-		return
+	out := struct {
+		emergencyOut
+		Commands []appCommand `json:"commands"`
+	}{Commands: s.takeAppCommands(deviceFrom(r).ID)}
+	if s.o.Emergency != nil {
+		out.emergencyOut = emergencyView(s.o.Emergency.Get())
 	}
-	writeJSON(w, http.StatusOK, emergencyView(s.o.Emergency.Get()))
+	writeJSON(w, http.StatusOK, out)
 }
 
 // StartEmergency avvia l'emergenza e manda l'annuncio ai tablet (in background).
@@ -75,11 +80,13 @@ func (s *Server) StopEmergency(da string) (bool, error) {
 	return ok, err
 }
 
+// tabletCount: dispositivi che leggono l'annuncio vocale (tablet FreeKiosk e PC con agente).
+// I PC con agente annunciano da soli una nuova emergenza al giro successivo.
 func (s *Server) tabletCount() int {
 	n := 0
 	s.o.Config.View(func(c *config.Config) {
 		for _, d := range c.Globali.Dispositivi {
-			if d.Kiosk != nil && d.Kiosk.Tipo != "" {
+			if (d.Kiosk != nil && d.Kiosk.Tipo != "") || d.Agente != nil {
 				n++
 			}
 		}
@@ -128,6 +135,7 @@ func (s *Server) maintEmergencyAnnounce(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	s.announce(st)
+	s.announceAgents(st.Announcement())
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "tablets": s.tabletCount()})
 }
 
