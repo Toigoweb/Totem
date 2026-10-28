@@ -1,7 +1,11 @@
 # Totem documenti di sicurezza
 
+> Per riprendere lo sviluppo (altra persona o altro assistente AI) partire da
+> [AGENTS.md](AGENTS.md).
+
 Totem offline-first per consultare in reparto le schede di sicurezza (SDS), le schede
-prodotto e i piani di emergenza che stanno sulle share SMB aziendali.
+prodotto e i piani di emergenza che stanno sulle share SMB aziendali, su OneDrive/SharePoint,
+su WebDAV o caricati direttamente dall'area manutenzione.
 
 - Un container Docker legge le share, conserva l'ultima versione valida di ogni PDF e la
   serve al totem.
