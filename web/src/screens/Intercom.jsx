@@ -109,7 +109,7 @@ export function PhoneHome() {
   };
   return (
     <div class="screen" data-testid="phone-home">
-      <TopBar title={S.icPhoneTitle} />
+      <TopBar title={S.icPhoneTitle} right={null} />
       <div class="body">
         {err && <div class="banner rosso" role="alert"><Icon name="errore" /><div>{S.icLoadErr}</div></div>}
         {dir === 'off' && <div class="banner" data-testid="ic-phone-off"><Icon name="info" /><div>{S.icPhoneOff}</div></div>}
@@ -117,7 +117,7 @@ export function PhoneHome() {
           <>
             <div class="campo ic-disp">
               <label for="ic-av">{S.icAvailable}</label>
-              <Toggle id="ic-av" on={dir.available} onChange={setAvail} label={S.icAvailable} />
+              <Toggle id="ic-av" on={dir.available} onChange={setAvail} />
               <p class="aiuto">{S.icAvailableHelp}</p>
             </div>
             <div class="campo">
