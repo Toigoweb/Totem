@@ -84,6 +84,7 @@ type Globals struct {
 	Salvaschermo Screensaver `json:"salvaschermo"`
 	Monitor      Monitor     `json:"monitor"`
 	Emergenza    Emergency   `json:"emergenza"`
+	Interfono    Intercom    `json:"interfono"`
 }
 
 // Department è un reparto: un gruppo di totem che vede solo alcune sezioni.
@@ -141,6 +142,43 @@ type Device struct {
 	Kiosk *Kiosk `json:"kiosk,omitempty"`
 	// Agente: script sul PC Windows che riferisce lo stato e riceve i comandi.
 	Agente *Agent `json:"agente,omitempty"`
+	// Interfono: il dispositivo può chiamare ed essere chiamato (serve un microfono).
+	Interfono *DeviceIntercom `json:"interfono,omitempty"`
+}
+
+// DeviceIntercom: impostazioni dell'interfono di un dispositivo.
+type DeviceIntercom struct {
+	Attivo      bool              `json:"attivo"`
+	Disponibile bool              `json:"disponibile"`      // telefoni: riceve le chiamate dei gruppi
+	Numero      string            `json:"numero,omitempty"` // da chiamare se non risponde
+	Push        *PushSubscription `json:"push,omitempty"`
+}
+
+// PushSubscription è la sottoscrizione Web Push del browser del telefono.
+type PushSubscription struct {
+	Endpoint string `json:"endpoint"`
+	P256dh   string `json:"p256dh"`
+	Auth     string `json:"auth"`
+}
+
+// Intercom: impostazioni globali dell'interfono. Spento, nessun dispositivo lo vede.
+type Intercom struct {
+	Attivo bool            `json:"attivo"`
+	Gruppi []IntercomGroup `json:"gruppi"`
+}
+
+// IntercomGroup: un ruolo da chiamare (primo soccorso, portineria…); squilla su tutti i
+// membri disponibili, risponde il primo.
+type IntercomGroup struct {
+	ID     string   `json:"id"`
+	Nome   string   `json:"nome"`
+	Numero string   `json:"numero,omitempty"` // da chiamare se nessuno risponde
+	Membri []string `json:"membri"`           // id dei dispositivi
+}
+
+// IntercomOn dice se l'interfono è attivo per un dispositivo.
+func (c *Config) IntercomOn(d Device) bool {
+	return c.Globali.Interfono.Attivo && d.Interfono != nil && d.Interfono.Attivo
 }
 
 // Agent è l'agente del PC Windows (deploy/windows/totem-agente.ps1). È il PC a chiamare il
