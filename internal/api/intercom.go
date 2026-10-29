@@ -135,6 +135,14 @@ type dirGroup struct {
 	Total     int    `json:"total"`
 }
 
+type dirChannel struct {
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	Online   int    `json:"online"`             // altri membri che sentono adesso
+	Speaking string `json:"speaking,omitempty"` // chi sta parlando
+	TalkID   string `json:"talkId,omitempty"`
+}
+
 type dirDevice struct {
 	ID         string `json:"id"`
 	Name       string `json:"name"`
@@ -147,12 +155,13 @@ type dirDevice struct {
 func (s *Server) intercomDirectory(w http.ResponseWriter, r *http.Request) {
 	me := deviceFrom(r).ID
 	out := struct {
-		Groups    []dirGroup  `json:"groups"`
-		Devices   []dirDevice `json:"devices"`
-		Available bool        `json:"available"`
-		Push      bool        `json:"push"`
-		VapidKey  string      `json:"vapidKey,omitempty"`
-	}{Groups: []dirGroup{}, Devices: []dirDevice{}}
+		Groups    []dirGroup   `json:"groups"`
+		Channels  []dirChannel `json:"channels"`
+		Devices   []dirDevice  `json:"devices"`
+		Available bool         `json:"available"`
+		Push      bool         `json:"push"`
+		VapidKey  string       `json:"vapidKey,omitempty"`
+	}{Groups: []dirGroup{}, Channels: []dirChannel{}, Devices: []dirDevice{}}
 	if s.o.Push != nil {
 		out.VapidKey = s.o.Push.Keys.PublicKey()
 	}
@@ -168,6 +177,17 @@ func (s *Server) intercomDirectory(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 			out.Groups = append(out.Groups, dg)
+		}
+		// canali: solo quelli di cui il dispositivo è membro
+		for _, ch := range c.Globali.Interfono.Canali {
+			if !contains(ch.Membri, me) {
+				continue
+			}
+			dc := dirChannel{ID: ch.ID, Name: ch.Nome, Online: len(s.pttListeners(c, ch, me))}
+			if t, ok := s.o.Intercom.Talking(ch.ID); ok {
+				dc.Speaking, dc.TalkID = t.Speaker.Name, t.ID
+			}
+			out.Channels = append(out.Channels, dc)
 		}
 		for _, d := range c.Globali.Dispositivi {
 			if d.ID == me {
@@ -422,15 +442,17 @@ type intercomDevOut struct {
 
 func (s *Server) maintIntercom(w http.ResponseWriter, r *http.Request) {
 	out := struct {
-		Attivo    bool                   `json:"attivo"`
-		Gruppi    []config.IntercomGroup `json:"gruppi"`
-		Devices   []intercomDevOut       `json:"devices"`
-		Available bool                   `json:"available"` // funzione presente sul server
-		Push      bool                   `json:"push"`
-	}{Gruppi: []config.IntercomGroup{}, Devices: []intercomDevOut{}, Available: s.o.Intercom != nil, Push: s.o.Push != nil}
+		Attivo    bool                     `json:"attivo"`
+		Gruppi    []config.IntercomGroup   `json:"gruppi"`
+		Canali    []config.IntercomChannel `json:"canali"`
+		Devices   []intercomDevOut         `json:"devices"`
+		Available bool                     `json:"available"` // funzione presente sul server
+		Push      bool                     `json:"push"`
+	}{Gruppi: []config.IntercomGroup{}, Canali: []config.IntercomChannel{}, Devices: []intercomDevOut{}, Available: s.o.Intercom != nil, Push: s.o.Push != nil}
 	s.o.Config.View(func(c *config.Config) {
 		out.Attivo = c.Globali.Interfono.Attivo
 		out.Gruppi = append(out.Gruppi, c.Globali.Interfono.Gruppi...)
+		out.Canali = append(out.Canali, c.Globali.Interfono.Canali...)
 		for _, d := range c.Globali.Dispositivi {
 			o := intercomDevOut{ID: d.ID, Nome: d.Nome, Ruolo: d.Ruolo}
 			if dep, ok := c.Department(d.Reparto); ok {
@@ -450,7 +472,25 @@ func (s *Server) maintIntercom(w http.ResponseWriter, r *http.Request) {
 			out.Gruppi[i].Membri = []string{}
 		}
 	}
+	for i := range out.Canali {
+		if out.Canali[i].Membri == nil {
+			out.Canali[i].Membri = []string{}
+		}
+	}
 	writeJSON(w, http.StatusOK, out)
+}
+
+// existingDevices: membri senza doppioni né dispositivi revocati.
+func existingDevices(c *config.Config, ids []string) []string {
+	seen := map[string]bool{}
+	out := []string{}
+	for _, m := range ids {
+		if _, ok := deviceByID(c, m); ok && !seen[m] {
+			seen[m] = true
+			out = append(out, m)
+		}
+	}
+	return out
 }
 
 func cleanNumber(n string) (string, bool) {
@@ -462,6 +502,8 @@ func (s *Server) putMaintIntercom(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Attivo bool                   `json:"attivo"`
 		Gruppi []config.IntercomGroup `json:"gruppi"`
+		// assente: canali invariati
+		Canali *[]config.IntercomChannel `json:"canali"`
 	}
 	if !readJSON(w, r, &req) {
 		return
@@ -487,18 +529,28 @@ func (s *Server) putMaintIntercom(w http.ResponseWriter, r *http.Request) {
 			if g.ID == "" {
 				g.ID = auth.NewID("ig")
 			}
-			seen := map[string]bool{}
-			membri := []string{}
-			for _, m := range g.Membri {
-				if _, ok := deviceByID(c, m); ok && !seen[m] {
-					seen[m] = true
-					membri = append(membri, m)
-				}
-			}
-			g.Membri = membri
+			g.Membri = existingDevices(c, g.Membri)
 			gs = append(gs, g)
 		}
-		c.Globali.Interfono = config.Intercom{Attivo: req.Attivo, Gruppi: gs}
+		chs := c.Globali.Interfono.Canali
+		if req.Canali != nil {
+			if len(*req.Canali) > maxIntercomGroup {
+				return &config.ValidationError{Field: "canali", Msg: "troppi canali"}
+			}
+			chs = make([]config.IntercomChannel, 0, len(*req.Canali))
+			for _, ch := range *req.Canali {
+				ch.Nome = strings.TrimSpace(ch.Nome)
+				if ch.Nome == "" || len([]rune(ch.Nome)) > 40 {
+					return &config.ValidationError{Field: "canale", Msg: "nome del canale mancante o troppo lungo"}
+				}
+				if ch.ID == "" {
+					ch.ID = auth.NewID("ic")
+				}
+				ch.Membri = existingDevices(c, ch.Membri)
+				chs = append(chs, ch)
+			}
+		}
+		c.Globali.Interfono = config.Intercom{Attivo: req.Attivo, Gruppi: gs, Canali: chs}
 		return nil
 	})
 	if err != nil {
@@ -569,4 +621,93 @@ func (s *Server) phoneIntercomCode(w http.ResponseWriter, r *http.Request) {
 	code := s.newPairCodeGrant(pairGrant{role: roleIntercomPhone, name: name}, phoneIntercomTTL)
 	s.o.Logger.Info("interfono: codice per un telefono", "nome", name)
 	writeJSON(w, http.StatusOK, map[string]any{"code": code, "path": "/?abbina=" + code, "expiresInSec": int(phoneIntercomTTL.Seconds())})
+}
+
+// ---------------------------------------------------------------------------
+// Push-to-talk sui canali
+
+func contains(list []string, v string) bool {
+	for _, x := range list {
+		if x == v {
+			return true
+		}
+	}
+	return false
+}
+
+// pttListeners: membri del canale che sentono adesso (flusso di eventi aperto; i telefoni
+// solo se disponibili).
+func (s *Server) pttListeners(c *config.Config, ch config.IntercomChannel, me string) []string {
+	out := []string{}
+	for _, id := range ch.Membri {
+		d, ok := deviceByID(c, id)
+		if !ok || id == me || !c.IntercomOn(d) || !s.o.Intercom.Online(id) {
+			continue
+		}
+		if d.Ruolo == RolePhone && !d.Interfono.Disponibile {
+			continue
+		}
+		out = append(out, id)
+	}
+	return out
+}
+
+func (s *Server) pttTalk(w http.ResponseWriter, r *http.Request) {
+	me := deviceFrom(r)
+	chID := r.PathValue("canale")
+	var ch config.IntercomChannel
+	var listeners, offline []string
+	found := false
+	s.o.Config.View(func(c *config.Config) {
+		me, _ = deviceByID(c, me.ID)
+		for _, x := range c.Globali.Interfono.Canali {
+			if x.ID == chID && contains(x.Membri, me.ID) {
+				ch, found = x, true
+				listeners = s.pttListeners(c, x, me.ID)
+				// telefoni disponibili con l'app chiusa: solo una notifica
+				for _, id := range x.Membri {
+					if d, ok := deviceByID(c, id); ok && id != me.ID && d.Ruolo == RolePhone && c.IntercomOn(d) &&
+						d.Interfono.Disponibile && !contains(listeners, id) {
+						offline = append(offline, id)
+					}
+				}
+			}
+		}
+	})
+	if !found {
+		jsonErr(w, http.StatusNotFound, "not_found")
+		return
+	}
+	t, err := s.o.Intercom.StartTalk(ch.ID, ch.Nome, party(me), listeners)
+	if errors.Is(err, intercom.ErrBusy) {
+		jsonErr(w, http.StatusConflict, "busy", "speaker", t.Speaker.Name)
+		return
+	}
+	if err != nil {
+		jsonErr(w, http.StatusInternalServerError, "ptt")
+		return
+	}
+	if len(offline) > 0 {
+		s.sendPush(offline, map[string]any{"tipo": "ptt", "id": t.ID, "da": me.Nome, "verso": ch.Nome}, intercom.MaxTalk)
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"talk": t})
+}
+
+func (s *Server) pttAction(w http.ResponseWriter, r *http.Request) {
+	id, me := r.PathValue("id"), deviceFrom(r)
+	switch r.PathValue("azione") {
+	case "release":
+		callErr(w, s.o.Intercom.EndTalk(id, me.ID))
+	case "signal":
+		var req struct {
+			To   string          `json:"to"`
+			Data json.RawMessage `json:"data"`
+		}
+		if !readJSON(w, r, &req) {
+			return
+		}
+		callErr(w, s.o.Intercom.TalkSignal(id, me.ID, req.To, req.Data))
+	default:
+		jsonErr(w, http.StatusNotFound, "not_found")
+	}
 }

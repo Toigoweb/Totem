@@ -64,7 +64,8 @@ verifica e li pubblica, il totem li conserva **offline** e li mostra anche senza
   leggere ad alta voce l'emergenza (README, "Tablet Android con FreeKiosk").
 - **Interfono** (spento di default, invisibile finché non si accende): chiamate a voce
   WebRTC in rete interna tra totem, postazioni e telefoni Android abbinati con QR; ruoli
-  con squillo di gruppo, 30 s poi numero di ripiego, notifiche Web Push ai telefoni
+  con squillo di gruppo, 30 s poi numero di ripiego, **walkie-talkie** sui canali (tieni
+  premuto per parlare, uno alla volta, 60 s al massimo), notifiche Web Push ai telefoni
   (`internal/intercom`, `internal/webpush`, `web/src/intercom/`). README, "Interfono".
 - **Fase 2 (telefoni con i documenti)**: nel modello e nelle API, spenta (`globali.fase2=false`).
 
@@ -79,7 +80,8 @@ verifica e li pubblica, il totem li conserva **offline** e li mostra anche senza
    disco. Le note della mappa incidenti non vanno mai nel manifest. Niente nomi di persone
    nei dati del totem. La chiave API dei tablet resta sul server.
    **Mai fotocamera o posizione** dei tablet e dei telefoni, e mai il **microfono** fuori
-   da una chiamata dell'interfono iniziata o accettata con un tocco: sarebbero controllo
+   da una chiamata dell'interfono iniziata o accettata con un tocco o dal pulsante del
+   walkie-talkie tenuto premuto: sarebbero controllo
    a distanza dei lavoratori (art. 4 L. 300/1970). Le chiamate non si registrano e il
    server non ne tiene la cronologia.
 4. **Sorgenti in sola lettura**: il server non scrive mai su SMB, OneDrive o WebDAV.

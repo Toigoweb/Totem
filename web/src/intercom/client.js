@@ -8,6 +8,7 @@
 import { app } from '../app.js';
 import { api } from '../api.js';
 import { startTone, stopTone } from './tone.js';
+import { onPttEvent, stopPtt } from './ptt.js';
 
 const CONNECT_TIMEOUT_MS = 15000;
 const ENDED_VISIBLE_MS = 20000;
@@ -85,11 +86,16 @@ export function stopIntercom() {
   if (es) es.close();
   es = null;
   app.set({ intercomLive: false });
+  stopPtt();
   const c = cur();
   if (c && c.phase !== 'ended') hangup();
 }
 
 function onEvent(ev) {
+  if (ev.type.startsWith('ptt-')) {
+    onPttEvent(ev);
+    return;
+  }
   if (ev.type === 'signal') {
     onSignal(ev.data);
     return;

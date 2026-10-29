@@ -63,9 +63,12 @@ type Call struct {
 
 // Event va a un dispositivo sul suo flusso di eventi.
 type Event struct {
-	Type   string          `json:"type"` // incoming | accepted | signal | ended
+	Type   string          `json:"type"` // incoming | accepted | signal | ended | ptt-start | ptt-signal | ptt-end
 	Call   *Call           `json:"call,omitempty"`
 	CallID string          `json:"callId,omitempty"`
+	Talk   *Talk           `json:"talk,omitempty"`
+	TalkID string          `json:"talkId,omitempty"`
+	From   string          `json:"from,omitempty"` // ptt-signal: chi lo manda
 	Reason string          `json:"reason,omitempty"`
 	Data   json.RawMessage `json:"data,omitempty"`
 }
@@ -75,6 +78,7 @@ type Hub struct {
 	mu    sync.Mutex
 	subs  map[string]map[chan Event]struct{}
 	calls map[string]*Call
+	talks map[string]*Talk // per canale
 	// OnRing è chiamata (fuori dal lock) per i dispositivi che devono squillare: il
 	// livello API manda le notifiche push ai telefoni.
 	OnRing func(c Call, devices []string)
@@ -92,7 +96,7 @@ func (h *Hub) stopped(id string, devs []string) {
 }
 
 func New() *Hub {
-	return &Hub{subs: map[string]map[chan Event]struct{}{}, calls: map[string]*Call{}, Now: time.Now}
+	return &Hub{subs: map[string]map[chan Event]struct{}{}, calls: map[string]*Call{}, talks: map[string]*Talk{}, Now: time.Now}
 }
 
 // Subscribe apre il flusso di eventi di un dispositivo; cancel lo chiude. Se una

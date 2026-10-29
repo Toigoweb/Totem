@@ -35,6 +35,11 @@ self.addEventListener('push', (e) => {
       body: `${S.icFrom}: ${d.da}`, tag, renotify: true, requireInteraction: true, vibrate: [600, 300, 600, 300, 600],
       data: d, actions: [{ action: 'rispondi', title: S.icAnswer }, { action: 'rifiuta', title: S.icReject }],
     }));
+  } else if (d.tipo === 'ptt') {
+    // walkie-talkie con l'app chiusa: solo un avviso, l'audio non si recupera
+    e.waitUntil(self.registration.showNotification(S.pttPushTitle(d.verso), {
+      body: S.pttLast(d.da), tag: `ptt-${d.verso}`, data: { tipo: 'ptt' },
+    }));
   } else if (d.tipo === 'fine') {
     e.waitUntil(self.registration.getNotifications({ tag }).then((list) => {
       const prev = list[0] && list[0].data;
@@ -48,6 +53,10 @@ self.addEventListener('push', (e) => {
 self.addEventListener('notificationclick', (e) => {
   const d = e.notification.data || {};
   e.notification.close();
+  if (d.tipo === 'ptt') {
+    e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => (list[0] ? list[0].focus() : self.clients.openWindow('/'))));
+    return;
+  }
   if (d.tipo !== 'chiamata' || !d.id) return;
   if (e.action === 'rifiuta') {
     e.waitUntil(fetch(`/api/intercom/calls/${encodeURIComponent(d.id)}/reject`, {

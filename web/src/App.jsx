@@ -21,6 +21,7 @@ import { SafetyAdmin } from './screens/SafetyAdmin.jsx';
 import { Intercom, PhoneHome } from './screens/Intercom.jsx';
 import { IntercomAdmin } from './screens/IntercomAdmin.jsx';
 import { CallOverlay } from './intercom/CallOverlay.jsx';
+import { PttBar } from './intercom/PttBar.jsx';
 import { startIntercom, stopIntercom } from './intercom/client.js';
 import { Departments, Contacts, Notices, ScreensaverSettings, Monitoring } from './screens/Extras.jsx';
 
@@ -52,6 +53,7 @@ export function App() {
       {s.toast && <div class="toast" role="status" data-testid="toast"><Icon name="spunta" />{s.toast}</div>}
       <Screensaver />
       <Emergency />
+      <PttBar />
       <CallOverlay />
     </>
   );

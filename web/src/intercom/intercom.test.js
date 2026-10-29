@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { reduceCall, endedView } from './client.js';
+import { reducePtt } from './ptt.js';
 import { b64ToBytes } from './push.js';
 import { qrPath } from '../components/Qr.jsx';
 import { fmtCode } from '../screens/Wizard.jsx';
@@ -43,5 +44,15 @@ describe('interfono: utilità', () => {
     const q = qrPath('https://totem.example/?abbina=K7QM4XPA');
     expect(q.n).toBeGreaterThanOrEqual(29);
     expect(q.d.startsWith('M')).toBe(true);
+  });
+});
+
+describe('walkie-talkie', () => {
+  it('chi parla arriva con ptt-start e se ne va con il suo ptt-end', () => {
+    const start = { type: 'ptt-start', talk: { id: 't1', channel: 'ch1', channelName: 'Magazzino', speaker: { id: 'd1', name: 'Totem Magazzino' } } };
+    const p = reducePtt(null, start);
+    expect(p).toMatchObject({ talkId: 't1', channelName: 'Magazzino', speaker: 'Totem Magazzino', me: false });
+    expect(reducePtt(p, { type: 'ptt-end', talkId: 'altro' })).toBe(p);
+    expect(reducePtt(p, { type: 'ptt-end', talkId: 't1' })).toBe(null);
   });
 });

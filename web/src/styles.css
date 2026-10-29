@@ -422,3 +422,23 @@ body:has(.em-fascia) .toast { bottom: 88px; z-index: 56; }
 @keyframes squillo { 50% { transform: scale(1.08); } }
 @media (prefers-reduced-motion: reduce) { .chiamata.f-ringing[data-dir="in"] .ch-badge { animation: none; } }
 @media (max-width: 600px) { .chiamata .ch-azioni .btn, .chiamata .ch-azioni .ch-si { min-width: 140px; min-height: 96px; font-size: 1.2rem; } }
+
+/* walkie-talkie */
+.ptt-canale { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; padding: 12px 20px; border: 3px solid var(--navy); border-radius: 12px; }
+.ptt-canale .n { flex: 1; display: grid; font-size: 1.3rem; font-weight: 700; min-width: 200px; }
+.ptt-canale .n small { font-size: .95rem; font-weight: 400; color: var(--grigio); }
+.ptt-btn { min-height: 96px; min-width: 320px; font-size: 1.3rem; background: var(--navy); color: var(--bianco); touch-action: none; -webkit-touch-callout: none; }
+.ptt-btn svg { width: 36px; height: 36px; }
+.ptt-btn.attivo { background: var(--rosso); border-color: var(--rosso); }
+.ptt-btn.piccolo { min-height: 64px; min-width: 240px; font-size: 1.05rem; background: var(--giallo); color: var(--navy); border-color: var(--giallo); }
+.ptt-btn.piccolo.attivo { background: var(--rosso); color: var(--bianco); border-color: var(--rosso); }
+.ptt-fascia { position: fixed; left: 0; right: 0; top: 0; z-index: 65; min-height: 72px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 8px 20px; background: var(--navy); color: var(--bianco); font-size: 1.15rem; box-shadow: 0 4px 16px rgba(0,0,0,.3); }
+.ptt-fascia > svg { width: 36px; height: 36px; flex: none; color: var(--giallo); }
+.ptt-fascia strong { font-size: 1.3rem; }
+.ptt-fascia span { flex: 1; opacity: .9; }
+.ptt-fascia.s-talking { background: var(--rosso); }
+.ptt-fascia.s-talking > svg { color: var(--bianco); }
+.ptt-fascia.s-error { background: var(--giallo); color: var(--navy); }
+.ptt-fascia.s-error > svg { color: var(--navy); }
+.ptt-fascia.s-listening > svg { animation: squillo 1s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .ptt-fascia.s-listening > svg { animation: none; } }

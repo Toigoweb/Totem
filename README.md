@@ -677,6 +677,18 @@ Solo voce: niente video.
    soccorso») più che la persona. Il totem mostra un **codice QR** e un codice da 8
    caratteri, validi 10 minuti.
 
+**Walkie-talkie (push-to-talk).** In *Manutenzione → Interfono → Canali walkie-talkie* si
+creano i canali (es. «Magazzino», «Squadra emergenza») e se ne scelgono i membri (totem,
+postazioni, telefoni). Nella schermata *Interfono* ogni canale ha il pulsante **Tieni
+premuto per parlare**: finché lo si tiene premuto, tutti i membri collegati sentono subito,
+senza dover rispondere (un segnale acustico apre e chiude il canale). Chi ha ascoltato vede
+in alto «Ha parlato …» con **Tieni premuto per rispondere**.
+- Parla uno alla volta: chi preme mentre un altro parla vede «Sta già parlando …».
+- Al massimo 60 secondi per pressione, poi il canale si chiude da solo.
+- Chi ascolta non apre il microfono: lo apre solo chi tiene premuto.
+- I telefoni sentono il canale con l'app aperta; con l'app chiusa ricevono solo una
+  notifica «Ha parlato …» (il messaggio non si può riascoltare: niente registrazioni).
+
 **Telefono** (solo Android con Chrome, collegato al Wi-Fi aziendale):
 1. Installare il certificato della CA interna (come per i tablet, sotto).
 2. Inquadrare il QR con la fotocamera: si apre il totem con il codice già scritto →

@@ -219,6 +219,39 @@ func TestIntercom(t *testing.T) {
 		t.Fatal(e)
 	}
 
+	// canale push-to-talk tra totem e postazione: il telefono non è membro
+	r = M(totem, mt, "PUT", "/api/maint/intercom", map[string]any{"attivo": true, "gruppi": groups, "canali": []any{
+		map[string]any{"nome": "Magazzino", "membri": []string{totemID, stationID}}}})
+	chID := r.body["canali"].([]any)[0].(map[string]any)["id"].(string)
+	if len(r.body["gruppi"].([]any)) != 1 {
+		t.Fatal("ruoli persi salvando i canali", string(r.raw))
+	}
+	r = h.do(totem, "GET", "/api/intercom/directory", nil)
+	if chs := r.body["channels"].([]any); len(chs) != 1 || chs[0].(map[string]any)["online"].(float64) != 1 {
+		t.Fatal(string(r.raw))
+	}
+	if r := h.do(phone, "POST", "/api/intercom/channels/"+chID+"/talk", map[string]any{}); r.code != 404 {
+		t.Fatal("telefono non membro sul canale", r.code)
+	}
+	r = h.do(totem, "POST", "/api/intercom/channels/"+chID+"/talk", map[string]any{})
+	talkID := r.body["talk"].(map[string]any)["id"].(string)
+	if e := waitEvent(t, stEv, "ptt-start"); e["talk"].(map[string]any)["speaker"].(map[string]any)["id"] != totemID {
+		t.Fatal(e)
+	}
+	if r := h.do(station, "POST", "/api/intercom/channels/"+chID+"/talk", map[string]any{}); r.code != 409 || r.body["speaker"] == "" {
+		t.Fatal("due che parlano insieme", string(r.raw))
+	}
+	if r := h.do(station, "POST", "/api/intercom/talks/"+talkID+"/signal", map[string]any{"to": totemID, "data": map[string]any{"type": "answer"}}); r.code != 200 {
+		t.Fatal(string(r.raw))
+	}
+	if e := waitEvent(t, tEv, "ptt-signal"); e["from"] != stationID {
+		t.Fatal(e)
+	}
+	if r := h.do(totem, "POST", "/api/intercom/talks/"+talkID+"/release", map[string]any{}); r.code != 200 {
+		t.Fatal(r.code)
+	}
+	waitEvent(t, stEv, "ptt-end")
+
 	// telefono non disponibile e senza flusso aperto: chiamata subito chiusa con il numero
 	h.do(phone, "PUT", "/api/intercom/me", map[string]any{"disponibile": false})
 	r = h.do(totem, "POST", "/api/intercom/calls", map[string]any{"target": "device:" + phoneID})

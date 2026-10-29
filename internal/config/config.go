@@ -163,8 +163,16 @@ type PushSubscription struct {
 
 // Intercom: impostazioni globali dell'interfono. Spento, nessun dispositivo lo vede.
 type Intercom struct {
-	Attivo bool            `json:"attivo"`
-	Gruppi []IntercomGroup `json:"gruppi"`
+	Attivo bool              `json:"attivo"`
+	Gruppi []IntercomGroup   `json:"gruppi"`
+	Canali []IntercomChannel `json:"canali,omitempty"`
+}
+
+// IntercomChannel: canale push-to-talk (walkie-talkie) tra i suoi membri.
+type IntercomChannel struct {
+	ID     string   `json:"id"`
+	Nome   string   `json:"nome"`
+	Membri []string `json:"membri"` // id dei dispositivi
 }
 
 // IntercomGroup: un ruolo da chiamare (primo soccorso, portineria…); squilla su tutti i

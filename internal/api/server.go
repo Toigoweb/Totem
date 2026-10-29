@@ -207,6 +207,8 @@ func (s *Server) Handler() http.Handler {
 	m.Handle("POST /api/intercom/calls", s.intercomDevice(s.intercomCall))
 	m.Handle("POST /api/intercom/calls/{id}/{azione}", s.intercomDevice(s.intercomAction))
 	m.Handle("PUT /api/intercom/me", s.intercomDevice(s.intercomMe))
+	m.Handle("POST /api/intercom/channels/{canale}/talk", s.intercomDevice(s.pttTalk))
+	m.Handle("POST /api/intercom/talks/{id}/{azione}", s.intercomDevice(s.pttAction))
 	m.Handle("GET /api/maint/intercom", s.maintOnly(http.HandlerFunc(s.maintIntercom)))
 	m.Handle("PUT /api/maint/intercom", s.maintOnly(http.HandlerFunc(s.putMaintIntercom)))
 	m.Handle("PUT /api/maint/devices/{id}/intercom", s.maintOnly(http.HandlerFunc(s.putDeviceIntercom)))

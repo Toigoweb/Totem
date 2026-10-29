@@ -8,6 +8,7 @@ import { useStore } from '../store.js';
 import { api } from '../api.js';
 import { call, startIntercom, stopIntercom } from '../intercom/client.js';
 import { pushSupport, enablePush, resubscribe } from '../intercom/push.js';
+import { PttButton } from '../intercom/PttBar.jsx';
 
 const REFRESH_MS = 5000;
 
@@ -48,9 +49,17 @@ export function DirectoryList({ dir }) {
   const devState = (d) => (d.busy ? S.icBusy : d.reachable ? S.icReach : S.icUnreach);
   const desks = dir.devices.filter((d) => d.role !== 'telefono');
   const phones = dir.devices.filter((d) => d.role === 'telefono');
-  if (!dir.groups.length && !dir.devices.length) return <p class="aiuto" data-testid="ic-empty">{S.icEmpty}</p>;
+  const channels = dir.channels || [];
+  if (!dir.groups.length && !dir.devices.length && !channels.length) return <p class="aiuto" data-testid="ic-empty">{S.icEmpty}</p>;
   return (
     <div class="ic-rubrica" data-testid="ic-directory">
+      {channels.length > 0 && <h2 class="blocco-tit">{S.pttChannels}</h2>}
+      {channels.map((c) => (
+        <div key={c.id} class="ptt-canale" data-testid="ptt-channel">
+          <span class="n">{c.name}<small>{c.speaking ? S.pttListening(c.speaking) : S.pttOnline(c.online)}</small></span>
+          <PttButton channel={c.id} name={c.name} disabled={!!c.speaking} />
+        </div>
+      ))}
       {dir.groups.length > 0 && <h2 class="blocco-tit">{S.icGroups}</h2>}
       {dir.groups.map((g) => (
         <Row key={g.id} testid="ic-group" name={g.name} state={S.icAvail(g.available)} ok={g.available > 0} onClick={() => call(`group:${g.id}`, g.name)} />

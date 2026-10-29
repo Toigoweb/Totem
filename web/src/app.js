@@ -43,6 +43,8 @@ export const app = createStore({
   emergencyOpen: false, // a tutto schermo (true) o ridotta alla fascia in basso
   call: null, // chiamata dell'interfono in corso (intercom/client.js)
   intercomLive: false, // flusso di eventi dell'interfono aperto
+  ptt: null, // walkie-talkie: chi sta parlando (intercom/ptt.js)
+  pttLast: null, // ultimo che ha parlato, per rispondere subito
 });
 
 let db;

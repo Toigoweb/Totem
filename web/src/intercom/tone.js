@@ -9,7 +9,7 @@ const PATTERNS = {
   ringback: { freqs: [425], on: [0, 1.0], period: 4000, gain: 0.15 },
 };
 
-function beep(p) {
+function ring(p) {
   const t0 = ctx.currentTime;
   for (let i = 0; i + 1 < p.on.length; i += 2) {
     const o = ctx.createOscillator();
@@ -31,12 +31,37 @@ export function startTone(kind) {
   try {
     if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
     if (ctx.state === 'suspended') ctx.resume().catch(() => {});
-    beep(p);
-    timer = setInterval(() => beep(p), p.period);
+    ring(p);
+    timer = setInterval(() => ring(p), p.period);
   } catch {
     // audio non disponibile: resta la schermata
   }
   if (kind === 'ring' && navigator.vibrate) navigator.vibrate([500, 300, 500]);
+}
+
+/** Segnale breve del walkie-talkie: 'in' quando si apre il canale, 'out' quando si chiude. */
+export function beep(kind) {
+  try {
+    if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+    if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+    beep1(kind === 'in' ? [880, 1320] : [1320, 880]);
+  } catch {
+    // audio non disponibile
+  }
+}
+
+function beep1(freqs) {
+  const t0 = ctx.currentTime;
+  freqs.forEach((f, i) => {
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.frequency.value = f;
+    g.gain.setValueAtTime(0.25, t0 + i * 0.09);
+    g.gain.linearRampToValueAtTime(0, t0 + i * 0.09 + 0.08);
+    o.connect(g).connect(ctx.destination);
+    o.start(t0 + i * 0.09);
+    o.stop(t0 + i * 0.09 + 0.09);
+  });
 }
 
 export function stopTone() {

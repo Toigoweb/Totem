@@ -23,6 +23,7 @@ function syncSoon() {
 export function IntercomAdmin() {
   const [data, setData] = useState(null);
   const [groups, setGroups] = useState([]);
+  const [channels, setChannels] = useState([]);
   const [err, setErr] = useState(null);
   const [phoneName, setPhoneName] = useState('');
   const [code, setCode] = useState(null); // { code, url, until }
@@ -34,6 +35,7 @@ export function IntercomAdmin() {
       if (r.ok) {
         setData(r.data);
         setGroups(r.data.gruppi.map((g) => ({ ...g })));
+        setChannels((r.data.canali || []).map((c) => ({ ...c })));
       }
     } catch {
       setErr(S.maintOffline);
@@ -51,16 +53,17 @@ export function IntercomAdmin() {
     return () => clearInterval(t);
   }, [code]);
 
-  const saveAll = async (attivo, gs = groups) => {
+  const saveAll = async (attivo, gs = groups, chs = channels) => {
     setErr(null);
     try {
-      const r = await maintApi('/api/maint/intercom', { method: 'PUT', body: { attivo, gruppi: gs } });
+      const r = await maintApi('/api/maint/intercom', { method: 'PUT', body: { attivo, gruppi: gs, canali: chs } });
       if (!r.ok) {
         setErr(S.icAdminErr[r.data.field] || S.saveErr);
         return;
       }
       setData(r.data);
       setGroups(r.data.gruppi.map((g) => ({ ...g })));
+      setChannels(r.data.canali.map((c) => ({ ...c })));
       setToast(S.icAdminSaved);
       syncSoon();
     } catch {
@@ -88,6 +91,7 @@ export function IntercomAdmin() {
     }
   };
 
+  const updCh = (i, patch) => setChannels(channels.map((c, j) => (j === i ? { ...c, ...patch } : c)));
   const upd = (i, patch) => setGroups(groups.map((g, j) => (j === i ? { ...g, ...patch } : g)));
   const members = data ? data.devices.filter((d) => d.attivo).map((d) => ({ id: d.id, nome: d.nome })) : [];
 
@@ -159,6 +163,29 @@ export function IntercomAdmin() {
                     <Icon name="piu" />{S.icAdminGroupAdd}
                   </button>
                   <button class="btn primario" data-testid="ic-save" onClick={() => saveAll(data.attivo)}><Icon name="spunta" />{S.save2}</button>
+                </div>
+
+                <h2 class="blocco-tit">{S.icAdminChannels}</h2>
+                <p class="piccolo">{S.icAdminChannelsHelp}</p>
+                {channels.map((c, i) => (
+                  <div class="riga-ed" key={c.id || `c${i}`} data-testid="ic-admin-channel">
+                    <div class="form">
+                      <div class="campo largo">
+                        <label for={`icc-${i}`}>{S.icAdminChannelName}</label>
+                        <input id={`icc-${i}`} class="input" maxLength={40} value={c.nome} onInput={(e) => updCh(i, { nome: e.currentTarget.value })} />
+                      </div>
+                      {members.length ? (
+                        <Chips label={S.icAdminMembers} options={members} value={c.membri} onChange={(v) => updCh(i, { membri: v })} />
+                      ) : <p class="piccolo">{S.icAdminNoMembers}</p>}
+                    </div>
+                    <button class="btn" aria-label={S.remove} onClick={() => setChannels(channels.filter((_, j) => j !== i))}><Icon name="cestino" /></button>
+                  </div>
+                ))}
+                <div class="azioni">
+                  <button class="btn" data-testid="ic-channel-add" disabled={channels.length >= 20} onClick={() => setChannels([...channels, { id: '', nome: '', membri: [] }])}>
+                    <Icon name="piu" />{S.icAdminChannelAdd}
+                  </button>
+                  <button class="btn primario" data-testid="ic-save-channels" onClick={() => saveAll(data.attivo)}><Icon name="spunta" />{S.save2}</button>
                 </div>
 
                 <h2 class="blocco-tit">{S.icAdminPhone}</h2>

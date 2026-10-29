@@ -134,3 +134,65 @@ test('interfono: invisibile da spento, chiamata tra totem e postazione, telefono
   await phoneCtx.close();
   await st.ctx.close();
 });
+
+test('walkie-talkie: tieni premuto per parlare, gli altri sentono e rispondono', async ({ page, context, browser, totem }) => {
+  test.skip(test.info().project.name !== 'desktop', 'due browser e WebRTC: basta il profilo desktop');
+  test.setTimeout(240_000);
+  await context.grantPermissions(['microphone'], { origin: totem.url });
+  totem.addPdf('emerg', 'Piano_di_evacuazione_rev5.pdf', 'plain', 'Piano di evacuazione');
+  await totem.waitManifest((m) => m.documents.length === 1);
+  await pair(page, totem);
+  const st = await pairWithCode(browser, totem, await totem.stationCode('Banco accettazione'));
+  await expect(st.page.getByTestId('home')).toBeVisible({ timeout: 90_000 });
+
+  await openMaint(page);
+  await page.getByTestId('open-intercom-admin').click();
+  await page.locator('#ic-on').click();
+  const rows = page.getByTestId('ic-admin-device');
+  for (const name of ['totem', 'Banco accettazione']) {
+    await rows.filter({ hasText: name }).getByRole('switch').click();
+    await expect(rows.filter({ hasText: name }).getByLabel('Numero se non risponde')).toBeVisible();
+  }
+  await page.getByTestId('ic-channel-add').click();
+  await page.getByLabel('Nome del canale').fill('Magazzino');
+  const ch = page.getByTestId('ic-admin-channel');
+  await ch.getByRole('button', { name: 'totem', exact: true }).click();
+  await ch.getByRole('button', { name: 'Banco accettazione', exact: true }).click();
+  await page.getByTestId('ic-save-channels').click();
+  await expect(page.getByTestId('toast')).toContainText('salvate');
+  await page.getByTestId('maint-exit').click();
+  await expect(page.getByTestId('intercom-open')).toBeVisible({ timeout: 20_000 });
+  await st.page.reload();
+  await expect(st.page.getByTestId('intercom-open')).toBeVisible({ timeout: 20_000 });
+
+  // il totem tiene premuto: la postazione sente senza toccare nulla
+  await page.getByTestId('intercom-open').click();
+  await expect(page.getByTestId('ptt-channel')).toContainText('1 in ascolto', { timeout: 10_000 });
+  const hold = page.getByTestId('ptt-channel').getByTestId('ptt-hold');
+  await hold.hover();
+  await page.mouse.down();
+  await expect(page.getByTestId('ptt-bar')).toHaveAttribute('data-state', 'talking');
+  await expect(page.getByTestId('ptt-bar')).toContainText('1 in ascolto');
+  await expect(st.page.getByTestId('ptt-bar')).toHaveAttribute('data-state', 'listening');
+  await expect(st.page.getByTestId('ptt-title')).toContainText('Sta parlando totem');
+  // l'audio arriva davvero: la postazione riceve la traccia del microfono del totem
+  await expect(st.page.getByTestId('ptt-bar')).toHaveAttribute('data-audio', '1', { timeout: 10_000 });
+  await page.mouse.up();
+  await expect(page.getByTestId('ptt-bar')).toHaveCount(0);
+
+  // la postazione risponde tenendo premuto dalla fascia
+  await expect(st.page.getByTestId('ptt-bar')).toHaveAttribute('data-state', 'last');
+  await st.page.getByTestId('ptt-bar').getByTestId('ptt-hold').hover();
+  await st.page.mouse.down();
+  await expect(st.page.getByTestId('ptt-bar')).toHaveAttribute('data-state', 'talking');
+  await expect(page.getByTestId('ptt-title')).toContainText('Sta parlando Banco accettazione');
+  await expect(page.getByTestId('ptt-bar')).toHaveAttribute('data-audio', '1', { timeout: 10_000 });
+  // mentre parla la postazione, il totem non può prendere la parola
+  await hold.hover();
+  await page.mouse.down();
+  await expect(page.getByTestId('ptt-bar')).toHaveAttribute('data-state', 'listening');
+  await page.mouse.up();
+  await st.page.mouse.up();
+  await expect(page.getByTestId('ptt-bar')).toHaveAttribute('data-state', 'last');
+  await st.ctx.close();
+});
